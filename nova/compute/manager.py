@@ -4795,19 +4795,22 @@ class ComputeManager(manager.Manager):
     def attach_interface(self, context, instance, network_id, port_id,
                          requested_ip):
         """Use hotplug to add an network adapter to an instance."""
-        network_info = self.network_api.allocate_port_for_instance(
-            context, instance, port_id, network_id, requested_ip)
-        if len(network_info) != 1:
-            LOG.error(_('allocate_port_for_instance returned %(ports)s ports')
-                      % dict(ports=len(network_info)))
-            raise exception.InterfaceAttachFailed(
-                    instance_uuid=instance.uuid)
-        image_ref = instance.get('image_ref')
-        image_meta = compute_utils.get_image_metadata(
-            context, self.image_api, image_ref, instance)
+        @utils.synchronized(instance['uuid'])
+        def _sync_attach_interface():
+            network_info = self.network_api.allocate_port_for_instance(
+                context, instance, port_id, network_id, requested_ip)
+            if len(network_info) != 1:
+                LOG.error(_('allocate_port_for_instance returned %(ports)s ports')
+                          % dict(ports=len(network_info)))
+                raise exception.InterfaceAttachFailed(
+                        instance_uuid=instance.uuid)
+            image_ref = instance.get('image_ref')
+            image_meta = compute_utils.get_image_metadata(
+                context, self.image_api, image_ref, instance)
 
-        self.driver.attach_interface(instance, image_meta, network_info[0])
-        return network_info[0]
+            self.driver.attach_interface(instance, image_meta, network_info[0])
+            return network_info[0]
+        return _sync_attach_interface()
 
     @object_compat
     @wrap_exception()
@@ -4815,19 +4818,22 @@ class ComputeManager(manager.Manager):
     @wrap_instance_fault
     def detach_interface(self, context, instance, port_id):
         """Detach an network adapter from an instance."""
-        network_info = instance.info_cache.network_info
-        condemned = None
-        for vif in network_info:
-            if vif['id'] == port_id:
-                condemned = vif
-                break
-        if condemned is None:
-            raise exception.PortNotFound(_("Port %s is not "
-                                           "attached") % port_id)
+        @utils.synchronized(instance['uuid'])
+        def _sync_dettach_interface():
+            network_info = instance.info_cache.network_info
+            condemned = None
+            for vif in network_info:
+                if vif['id'] == port_id:
+                    condemned = vif
+                    break
+            if condemned is None:
+                raise exception.PortNotFound(_("Port %s is not "
+                                               "attached") % port_id)
 
-        self.network_api.deallocate_port_for_instance(context, instance,
-                                                      port_id)
-        self.driver.detach_interface(instance, condemned)
+            self.network_api.deallocate_port_for_instance(context, instance,
+                                                          port_id)
+            self.driver.detach_interface(instance, condemned)
+        return _sync_dettach_interface()
 
     def _get_compute_info(self, context, host):
         service = objects.Service.get_by_compute_host(context, host)
@@ -5359,21 +5365,24 @@ class ComputeManager(manager.Manager):
                     break
 
         if instance:
-            # We have an instance now to refresh
-            try:
-                # Call to network API to get instance info.. this will
-                # force an update to the instance's info_cache
-                self._get_instance_nw_info(context, instance, use_slave=True)
-                LOG.debug('Updated the network info_cache for instance',
-                          instance=instance)
-            except exception.InstanceNotFound:
-                # Instance is gone.
-                LOG.debug('Instance no longer exists. Unable to refresh',
-                          instance=instance)
-                return
-            except Exception:
-                LOG.error(_('An error occurred while refreshing the network '
-                            'cache.'), instance=instance, exc_info=True)
+            @utils.synchronized(instance['uuid'])
+            def _heal_instance_info_cache():
+                # We have an instance now to refresh
+                try:
+                    # Call to network API to get instance info.. this will
+                    # force an update to the instance's info_cache
+                    self._get_instance_nw_info(context, instance, use_slave=True)
+                    LOG.debug('Updated the network info_cache for instance',
+                              instance=instance)
+                except exception.InstanceNotFound:
+                    # Instance is gone.
+                    LOG.debug('Instance no longer exists. Unable to refresh',
+                              instance=instance)
+                    return
+                except Exception:
+                    LOG.error(_('An error occurred while refreshing the network '
+                                'cache.'), instance=instance, exc_info=True)
+            _heal_instance_info_cache()
         else:
             LOG.debug("Didn't find any instances for network info cache "
                       "update.")
