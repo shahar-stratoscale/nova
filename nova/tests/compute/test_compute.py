@@ -9165,6 +9165,7 @@ class ComputeAPITestCase(BaseTestCase):
         sys_meta = flavors.save_flavor_info({}, new_type)
 
         instance = objects.Instance(image_ref='foo',
+                                    uuid='uuid666',
                                     system_metadata=sys_meta)
         self.mox.StubOutWithMock(self.compute.network_api,
                                  'allocate_port_for_instance')
@@ -9189,7 +9190,7 @@ class ComputeAPITestCase(BaseTestCase):
         self.stubs.Set(self.compute.network_api,
                        'deallocate_port_for_instance',
                        lambda a, b, c: [])
-        instance = objects.Instance()
+        instance = objects.Instance(uuid='uuid666')
         instance.info_cache = objects.InstanceInfoCache.new(
             self.context, 'fake-uuid')
         instance.info_cache.network_info = network_model.NetworkInfo.hydrate(
