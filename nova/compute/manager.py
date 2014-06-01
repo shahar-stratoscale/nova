@@ -4757,10 +4757,16 @@ class ComputeManager(manager.Manager):
             'no_device': None}
         bdm.update(values)
         bdm.save()
+
+        mode = 'rw'
+        if 'data' in new_cinfo:
+            mode = new_cinfo['data'].get('access_mode', 'rw')
+
         self.volume_api.attach(context,
                                new_volume_id,
                                instance.uuid,
-                               mountpoint)
+                               mountpoint,
+                               mode=mode)
         # Remove old connection
         self.volume_api.detach(context.elevated(), old_volume_id)
 

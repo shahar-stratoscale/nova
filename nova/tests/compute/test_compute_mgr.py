@@ -1150,7 +1150,7 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
             self.assertTrue(uuidutils.is_uuid_like(volume_id))
             return volumes[volume_id]
 
-        def fake_vol_attach(context, volume_id, instance_uuid, connector):
+        def fake_vol_attach(context, volume_id, instance_uuid, connector, mode):
             self.assertTrue(uuidutils.is_uuid_like(volume_id))
             self.assertIn(volumes[volume_id]['status'],
                           ['available', 'attaching'])
