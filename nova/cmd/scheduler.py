@@ -17,6 +17,7 @@
 """Starter script for Nova Scheduler."""
 
 import sys
+sys.path.append( '/usr/share/strato-loadbalancer/loadbalancer_nova_filter.egg' )
 
 from oslo.config import cfg
 
