@@ -1180,3 +1180,20 @@ class LibvirtGPFSVolumeDriver(LibvirtBaseVolumeDriver):
         conf.source_type = "file"
         conf.source_path = connection_info['data']['device_path']
         return conf
+
+
+class LibvirtMancalaVolumeDriver(LibvirtBaseVolumeDriver):
+    """Driver to attach Mancala (StratoStorage) volumes to libvirt."""
+    def __init__(self, connection):
+        super(LibvirtMancalaVolumeDriver,
+              self).__init__(connection, is_block_dev=False)
+
+    def connect_volume(self, connection_info, disk_info):
+        conf = super(LibvirtMancalaVolumeDriver,
+                     self).connect_volume(connection_info,
+                                          disk_info)
+        stratodisk_properties = connection_info['data']
+        conf.source_type = "network"
+        #conf.source_protocol = connection_info['driver_volume_type']
+        conf.source_protocol = "strato"
+        conf.source_name = stratodisk_properties.get('name')
