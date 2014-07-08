@@ -18,6 +18,7 @@
             "name": "m1.tiny",
             "os-flavor-access:is_public": true,
             "ram": 512,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "swap": "",
             "vcpus": 1
@@ -40,6 +41,7 @@
             "name": "m1.small",
             "os-flavor-access:is_public": true,
             "ram": 2048,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "swap": "",
             "vcpus": 1
@@ -62,6 +64,7 @@
             "name": "m1.medium",
             "os-flavor-access:is_public": true,
             "ram": 4096,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "swap": "",
             "vcpus": 2
@@ -84,6 +87,7 @@
             "name": "m1.large",
             "os-flavor-access:is_public": true,
             "ram": 8192,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "swap": "",
             "vcpus": 4
@@ -106,6 +110,7 @@
             "name": "m1.xlarge",
             "os-flavor-access:is_public": true,
             "ram": 16384,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "swap": "",
             "vcpus": 8

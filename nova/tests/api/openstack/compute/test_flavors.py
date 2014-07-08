@@ -158,6 +158,7 @@ class FlavorsTestV21(test.TestCase):
                 "ram": "256",
                 "disk": "10",
                 "vcpus": "",
+                "extra_specs": {},
                 "links": [
                     {
                         "rel": "self",
@@ -188,6 +189,7 @@ class FlavorsTestV21(test.TestCase):
                 "ram": "256",
                 "disk": "10",
                 "vcpus": "",
+                "extra_specs": {},
                 "links": [
                     {
                         "rel": "self",
@@ -412,6 +414,7 @@ class FlavorsTestV21(test.TestCase):
                     "ram": "256",
                     "disk": "10",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",
@@ -431,6 +434,7 @@ class FlavorsTestV21(test.TestCase):
                     "ram": "512",
                     "disk": "20",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",
@@ -540,6 +544,7 @@ class FlavorsTestV21(test.TestCase):
                     "ram": "512",
                     "disk": "20",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",
@@ -583,6 +588,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                 "ram": "256",
                 "disk": "10",
                 "vcpus": "",
+                "extra_specs": {},
                 "links": [
                     {
                         "rel": "self",
@@ -610,6 +616,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                 "ram": "256",
                 "disk": "10",
                 "vcpus": "",
+                "extra_specs": {},
                 "links": [
                     {
                         "rel": "self",
@@ -647,6 +654,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                 "ram": 256,
                 "disk": 10,
                 "vcpus": "",
+                "extra_specs": {},
                 "links": [
                     {
                         "rel": "self",
@@ -685,6 +693,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                     "ram": "512",
                     "disk": "20",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",
@@ -702,6 +711,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                     "ram": "256",
                     "disk": "10",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",
@@ -744,6 +754,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                     "ram": "512",
                     "disk": "20",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",
@@ -761,6 +772,7 @@ class FlavorsXMLSerializationTest(test.TestCase):
                     "ram": "256",
                     "disk": "10",
                     "vcpus": "",
+                    "extra_specs": {},
                     "links": [
                         {
                             "rel": "self",

@@ -39,6 +39,7 @@ class ViewBuilder(common.ViewBuilder):
                 "ram": flavor["memory_mb"],
                 "disk": flavor["root_gb"],
                 "vcpus": flavor.get("vcpus") or "",
+                "extra_specs": flavor.get("extra_specs") or {},
                 "links": self._get_links(request,
                                          flavor["flavorid"],
                                          self._collection_name),

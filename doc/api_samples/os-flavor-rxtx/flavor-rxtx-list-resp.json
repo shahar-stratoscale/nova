@@ -15,6 +15,7 @@
             ],
             "name": "m1.tiny",
             "ram": 512,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "vcpus": 1
         },
@@ -33,6 +34,7 @@
             ],
             "name": "m1.small",
             "ram": 2048,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "vcpus": 1
         },
@@ -51,6 +53,7 @@
             ],
             "name": "m1.medium",
             "ram": 4096,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "vcpus": 2
         },
@@ -69,6 +72,7 @@
             ],
             "name": "m1.large",
             "ram": 8192,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "vcpus": 4
         },
@@ -87,6 +91,7 @@
             ],
             "name": "m1.xlarge",
             "ram": 16384,
+            "extra_specs": {},
             "rxtx_factor": 1.0,
             "vcpus": 8
         }

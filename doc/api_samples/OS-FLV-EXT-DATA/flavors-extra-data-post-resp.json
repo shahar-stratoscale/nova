@@ -15,6 +15,7 @@
         ],
         "name": "flavortest",
         "ram": 1024,
+        "extra_specs": {},
         "vcpus": 2
     }
 }
