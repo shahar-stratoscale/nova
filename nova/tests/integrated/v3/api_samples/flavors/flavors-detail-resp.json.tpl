@@ -19,6 +19,7 @@
             "os-flavor-access:is_public": true,
             "ram": 512,
             "swap": "",
+            "extra_specs": {},
             "vcpus": 1
         },
         {
@@ -40,6 +41,7 @@
             "os-flavor-access:is_public": true,
             "ram": 2048,
             "swap": "",
+            "extra_specs": {},
             "vcpus": 1
         },
         {
@@ -61,6 +63,7 @@
             "os-flavor-access:is_public": true,
             "ram": 4096,
             "swap": "",
+            "extra_specs": {},
             "vcpus": 2
         },
         {
@@ -82,6 +85,7 @@
             "os-flavor-access:is_public": true,
             "ram": 8192,
             "swap": "",
+            "extra_specs": {},
             "vcpus": 4
         },
         {
@@ -103,6 +107,7 @@
             "os-flavor-access:is_public": true,
             "ram": 16384,
             "swap": "",
+            "extra_specs": {},
             "vcpus": 8
         }
     ]

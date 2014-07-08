@@ -16,6 +16,7 @@
         "os-flavor-access:is_public": true,
         "ram": 1024,
         "rxtx_factor": 2.0,
+        "extra_specs": {},
         "vcpus": 2,
         "OS-FLV-DISABLED:disabled": false,
         "OS-FLV-EXT-DATA:ephemeral": 0,

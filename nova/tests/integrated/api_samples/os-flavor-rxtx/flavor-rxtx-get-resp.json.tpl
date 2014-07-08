@@ -14,6 +14,7 @@
         ],
         "name": "%(flavor_name)s",
         "ram": 512,
+        "extra_specs": {},
         "rxtx_factor": 1.0,
         "vcpus": 1
     }

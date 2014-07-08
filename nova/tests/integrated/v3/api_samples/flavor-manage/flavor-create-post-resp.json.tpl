@@ -15,6 +15,7 @@
         "name": "%(flavor_name)s",
         "os-flavor-access:is_public": true,
         "ram": 1024,
+        "extra_specs": {},
         "vcpus": 2,
         "OS-FLV-DISABLED:disabled": false,
         "OS-FLV-EXT-DATA:ephemeral": 0,

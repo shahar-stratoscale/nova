@@ -18,6 +18,7 @@
         "name": "m1.tiny",
         "ram": 512,
         "swap": "",
+        "extra_specs": {},
         "vcpus": 1
     }
 }
