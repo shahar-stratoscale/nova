@@ -74,6 +74,7 @@ class MigrateServerController(wsgi.Controller):
         block_migration = body["os-migrateLive"]["block_migration"]
         disk_over_commit = body["os-migrateLive"]["disk_over_commit"]
         host = body["os-migrateLive"]["host"]
+        pclm = body["os-migrateLive"]["pclm"]
 
         block_migration = strutils.bool_from_string(block_migration,
                                                     strict=True)
@@ -84,7 +85,7 @@ class MigrateServerController(wsgi.Controller):
             instance = common.get_instance(self.compute_api, context, id,
                                            want_objects=True)
             self.compute_api.live_migrate(context, instance, block_migration,
-                                          disk_over_commit, host)
+                                          disk_over_commit, host, pclm)
         except (exception.NoValidHost,
                 exception.ComputeServiceUnavailable,
                 exception.InvalidHypervisorType,

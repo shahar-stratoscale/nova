@@ -374,7 +374,7 @@ class ComputeAPI(object):
                             'more information!'))
 
     def check_can_live_migrate_destination(self, ctxt, instance, destination,
-                                           block_migration, disk_over_commit):
+                                           block_migration, disk_over_commit, pclm):
         if self.client.can_send_version('3.32'):
             version = '3.32'
         else:
@@ -384,7 +384,8 @@ class ComputeAPI(object):
         return cctxt.call(ctxt, 'check_can_live_migrate_destination',
                           instance=instance,
                           block_migration=block_migration,
-                          disk_over_commit=disk_over_commit)
+                          disk_over_commit=disk_over_commit,
+                          pclm=pclm)
 
     def check_can_live_migrate_source(self, ctxt, instance, dest_check_data):
         if self.client.can_send_version('3.32'):
@@ -551,7 +552,7 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'inject_network_info', instance=instance)
 
-    def live_migration(self, ctxt, instance, dest, block_migration, host,
+    def live_migration(self, ctxt, instance, dest, block_migration, host, pclm,
                        migrate_data=None):
         if self.client.can_send_version('3.26'):
             version = '3.26'
@@ -560,7 +561,7 @@ class ComputeAPI(object):
             instance = jsonutils.to_primitive(instance)
         cctxt = self.client.prepare(server=host, version=version)
         cctxt.cast(ctxt, 'live_migration', instance=instance,
-                   dest=dest, block_migration=block_migration,
+                   dest=dest, block_migration=block_migration, pclm=pclm,
                    migrate_data=migrate_data)
 
     def pause_instance(self, ctxt, instance):
