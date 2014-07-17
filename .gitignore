@@ -1,0 +1,9 @@
+*.pyc
+.ropeproject
+.testrepository
+.tox
+.venv
+nova.egg-info
+*py#
+*.#*
+CA/
