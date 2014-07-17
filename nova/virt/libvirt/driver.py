@@ -154,6 +154,11 @@ libvirt_opts = [
                help='Migration target URI '
                     '(any included "%s" is replaced with '
                     'the migration target hostname)'),
+    cfg.StrOpt('pclm_uri',
+               default="pclm:%s:%s",
+               help='PCLM URI '
+                    '1st "%s" is replaced with migration source NodeId'
+                    '2nd "%s" is replaced with target hostname)'),
     cfg.StrOpt('live_migration_flag',
                default='VIR_MIGRATE_UNDEFINE_SOURCE, VIR_MIGRATE_PEER2PEER, '
                        'VIR_MIGRATE_LIVE, VIR_MIGRATE_TUNNELLED',
@@ -4985,7 +4990,8 @@ class LibvirtDriver(driver.ComputeDriver):
     def check_can_live_migrate_destination(self, context, instance,
                                            src_compute_info, dst_compute_info,
                                            block_migration=False,
-                                           disk_over_commit=False):
+                                           disk_over_commit=False,
+                                           pclm=None):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls
@@ -5018,7 +5024,8 @@ class LibvirtDriver(driver.ComputeDriver):
                 "image_type": CONF.libvirt.images_type,
                 "block_migration": block_migration,
                 "disk_over_commit": disk_over_commit,
-                "disk_available_mb": disk_available_mb}
+                "disk_available_mb": disk_available_mb,
+                "pclm": pclm}
 
     def check_can_live_migrate_destination_cleanup(self, context,
                                                    dest_check_data):
@@ -5266,7 +5273,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def live_migration(self, context, instance, dest,
                        post_method, recover_method, block_migration=False,
-                       migrate_data=None):
+                       migrate_data=None, pclm=None):
         """Spawning live_migration operation for distributing high-load.
 
         :param context: security context
@@ -5293,7 +5300,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
         greenthread.spawn(self._live_migration, context, instance, dest,
                           post_method, recover_method, block_migration,
-                          migrate_data)
+                          migrate_data, pclm)
 
     def _correct_listen_addr(self, old_xml_str, listen_addrs):
         # NB(sross): can't just use LibvirtConfigGuest#parse_str
@@ -5355,7 +5362,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def _live_migration(self, context, instance, dest, post_method,
                         recover_method, block_migration=False,
-                        migrate_data=None):
+                        migrate_data=None, pclm=None):
         """Do live migration.
 
         :param context: security context
@@ -5382,6 +5389,10 @@ class LibvirtDriver(driver.ComputeDriver):
             flagvals = [getattr(libvirt, x.strip()) for x in flaglist]
             logical_sum = reduce(lambda x, y: x | y, flagvals)
 
+            LOG.info(_LI('libvirt driver migrate to URI '
+                       '%(dest)s %(pclm)s.'),
+                     {'dest': dest, 'pclm': pclm}, instance=instance)
+
             dom = self._lookup_by_name(instance["name"])
 
             pre_live_migrate_data = (migrate_data or {}).get(
@@ -5391,19 +5402,28 @@ class LibvirtDriver(driver.ComputeDriver):
             migratable_flag = getattr(libvirt, 'VIR_DOMAIN_XML_MIGRATABLE',
                                       None)
 
-            if migratable_flag is None or listen_addrs is None:
+            if (migratable_flag is None or listen_addrs is None) and not pclm:
                 self._check_graphics_addresses_can_live_migrate(listen_addrs)
+                LOG.info(_LI('libvirt driver migrate to migrateToURI %(uri)s.'),
+                         {'uri': CONF.libvirt.live_migration_uri % dest}, instance=instance)
                 dom.migrateToURI(CONF.libvirt.live_migration_uri % dest,
                                  logical_sum,
                                  None,
                                  CONF.libvirt.live_migration_bandwidth)
             else:
-                old_xml_str = dom.XMLDesc(migratable_flag)
-                new_xml_str = self._correct_listen_addr(old_xml_str,
-                                                        listen_addrs)
+                if migratable_flag is None or listen_addrs is None:
+                    LOG.debug("without new xml specified", instance=instance)
+                    nex_xml_str = None
+                else:
+                    LOG.debug("specifying new xml", instance=instance)
+                    old_xml_str = dom.XMLDesc(migratable_flag)
+                    new_xml_str = self._correct_listen_addr(old_xml_str,
+                                                            listen_addrs)
                 try:
+                    LOG.info(_LI('libvirt driver migrate to migrateToURI2 %(uri)s.'),
+                             {'uri': CONF.libvirt.live_migration_uri % dest}, instance=instance)
                     dom.migrateToURI2(CONF.libvirt.live_migration_uri % dest,
-                                      None,
+                                      CONF.libvirt.pclm_uri % (pclm, dest) if pclm else None,
                                       new_xml_str,
                                       logical_sum,
                                       None,
@@ -5421,7 +5441,7 @@ class LibvirtDriver(driver.ComputeDriver):
                     # TODO(mriedem): Remove this workaround when
                     # Red Hat BZ #1141838 is closed.
                     error_code = ex.get_error_code()
-                    if error_code == libvirt.VIR_ERR_CONFIG_UNSUPPORTED:
+                    if error_code == libvirt.VIR_ERR_CONFIG_UNSUPPORTED and not pclm:
                         LOG.warn(_LW('An error occurred trying to live '
                                      'migrate. Falling back to legacy live '
                                      'migrate flow. Error: %s'), ex,

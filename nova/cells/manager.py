@@ -510,12 +510,13 @@ class CellsManager(manager.Manager):
                                         flavor, extra_instance_updates)
 
     def live_migrate_instance(self, ctxt, instance, block_migration,
-                              disk_over_commit, host_name):
+                              disk_over_commit, host_name, pclm):
         """Live migrate an instance in its cell."""
         self.msg_runner.live_migrate_instance(ctxt, instance,
                                               block_migration,
                                               disk_over_commit,
-                                              host_name)
+                                              host_name,
+                                              pclm)
 
     def revert_resize(self, ctxt, instance):
         """Revert a resize for an instance in its cell."""

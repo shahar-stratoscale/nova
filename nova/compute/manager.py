@@ -4863,7 +4863,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def check_can_live_migrate_destination(self, ctxt, instance,
-                                           block_migration, disk_over_commit):
+                                           block_migration, disk_over_commit, pclm):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls
@@ -4881,7 +4881,7 @@ class ComputeManager(manager.Manager):
             self._get_compute_info(ctxt, CONF.host))
         dest_check_data = self.driver.check_can_live_migrate_destination(ctxt,
             instance, src_compute_info, dst_compute_info,
-            block_migration, disk_over_commit)
+            block_migration, disk_over_commit, pclm)
         migrate_data = {}
         try:
             migrate_data = self.compute_rpcapi.\
@@ -4968,7 +4968,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def live_migration(self, context, dest, instance, block_migration,
-                       migrate_data):
+                       migrate_data, pclm):
         """Executing live migration.
 
         :param context: security context
@@ -5015,7 +5015,7 @@ class ComputeManager(manager.Manager):
         self.driver.live_migration(context, instance, dest,
                                    self._post_live_migration,
                                    self._rollback_live_migration,
-                                   block_migration, migrate_data)
+                                   block_migration, migrate_data, pclm)
 
     def _live_migration_cleanup_flags(self, block_migration, migrate_data):
         """Determine whether disks or intance path need to be cleaned up after
@@ -5053,7 +5053,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def _post_live_migration(self, ctxt, instance,
-                            dest, block_migration=False, migrate_data=None):
+                            dest, block_migration=False, migrate_data=None, pclm=None):
         """Post operations for live migration.
 
         This method is called from live_migration
