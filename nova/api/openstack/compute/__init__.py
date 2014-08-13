@@ -69,7 +69,7 @@ class APIRouter(nova.api.openstack.APIRouter):
             self.resources['servers'] = servers.create_resource(ext_mgr)
             mapper.resource("server", "servers",
                             controller=self.resources['servers'],
-                            collection={'detail': 'GET'},
+                            collection={'detail': 'GET', 'stratolist': 'GET'},
                             member={'action': 'POST'})
 
         if init_only is None or 'ips' in init_only:
