@@ -1835,6 +1835,97 @@ def instance_get_all(context, columns_to_join=None):
 
 
 @require_context
+def strato_instance_get_all_by_filters(context, filters, sort_key, sort_dir,
+                                       limit=None, marker=None):
+    sort_fn = {'desc': desc, 'asc': asc}
+    session = get_session()
+    query_prefix = session.query(models.Instance)
+    query_prefix = query_prefix.options(joinedload('instance_type'))
+    query_prefix = query_prefix.order_by(sort_fn[sort_dir](
+            getattr(models.Instance, sort_key)))
+
+    # Make a copy of the filters dictionary to use going forward, as we'll
+    # be modifying it and we shouldn't affect the caller's use of it.
+    filters = filters.copy()
+
+    if 'changes-since' in filters:
+        changes_since = timeutils.normalize_time(filters['changes-since'])
+        query_prefix = query_prefix.\
+                            filter(models.Instance.updated_at > changes_since)
+
+    if 'deleted' in filters:
+        # Instances can be soft or hard deleted and the query needs to
+        # include or exclude both
+        if filters.pop('deleted'):
+            if filters.pop('soft_deleted', True):
+                deleted = or_(
+                    models.Instance.deleted == models.Instance.id,
+                    models.Instance.vm_state == vm_states.SOFT_DELETED
+                    )
+                query_prefix = query_prefix.\
+                    filter(deleted)
+            else:
+                query_prefix = query_prefix.\
+                    filter(models.Instance.deleted == models.Instance.id)
+        else:
+            query_prefix = query_prefix.\
+                    filter_by(deleted=0)
+            if not filters.pop('soft_deleted', False):
+                query_prefix = query_prefix.\
+                    filter(models.Instance.vm_state != vm_states.SOFT_DELETED)
+
+    if 'cleaned' in filters:
+        if filters.pop('cleaned'):
+            query_prefix = query_prefix.filter(models.Instance.cleaned == 1)
+        else:
+            query_prefix = query_prefix.filter(models.Instance.cleaned == 0)
+
+    if not context.is_admin:
+        # If we're not admin context, add appropriate filter..
+        if context.project_id:
+            filters['project_id'] = context.project_id
+        else:
+            filters['user_id'] = context.user_id
+
+    # Filters for exact matches that we can do along with the SQL query...
+    # For other filters that don't match this, we will do regexp matching
+    exact_match_filter_names = ['project_id', 'user_id', 'image_ref',
+                                'vm_state', 'instance_type_id', 'uuid',
+                                'metadata', 'host', 'task_state',
+                                'system_metadata']
+
+    # Filter the query
+    query_prefix = exact_filter(query_prefix, models.Instance,
+                                filters, exact_match_filter_names)
+
+    query_prefix = regex_filter(query_prefix, models.Instance, filters)
+    query_prefix = tag_filter(context, query_prefix, models.Instance,
+                              models.InstanceMetadata,
+                              models.InstanceMetadata.instance_uuid,
+                              filters)
+
+    # paginate query
+    if marker is not None:
+        try:
+            marker = _instance_get_by_uuid(context, marker, session=session)
+        except exception.InstanceNotFound:
+            raise exception.MarkerNotFound(marker)
+    query_prefix = sqlalchemyutils.paginate_query(query_prefix,
+                           models.Instance, limit,
+                           [sort_key, 'created_at', 'id'],
+                           marker=marker,
+                           sort_dir=sort_dir)
+
+    instances = query_prefix.all()
+    filled_instances = []
+    for inst in instances:
+        inst = dict(inst.iteritems())
+        inst['instance_type'] = dict(inst['instance_type'][0].iteritems())
+        filled_instances.append(inst)
+    return filled_instances
+
+
+@require_context
 def instance_get_all_by_filters(context, filters, sort_key, sort_dir,
                                 limit=None, marker=None, columns_to_join=None,
                                 use_slave=False):

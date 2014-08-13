@@ -113,6 +113,36 @@ class ViewBuilder(common.ViewBuilder):
 
         return server
 
+    def strato_show(self, request, instance):
+        """Detailed view of a single instance."""
+        server = {
+            "server": {
+                "id": instance["uuid"],
+                "name": instance["display_name"],
+                "status": self._get_vm_status(instance),
+                "tenant_id": instance.get("project_id") or "",
+                "user_id": instance.get("user_id") or "",
+                "image": self._get_image(request, instance),
+                "flavor": self._strato_get_flavor(request, instance),
+                "created": timeutils.isotime(instance["created_at"]),
+                "updated": timeutils.isotime(instance["updated_at"]),
+                "OS-EXT-SRV-ATTR:host": instance["host"],
+                "links": self._get_links(request,
+                                         instance["uuid"],
+                                         self._collection_name),
+            },
+        }
+        if server["server"]["status"] in self._fault_statuses:
+            _inst_fault = self._get_fault(request, instance)
+            if _inst_fault:
+                server['server']['fault'] = _inst_fault
+
+        if server["server"]["status"] in self._progress_statuses:
+            server["server"]["progress"] = instance.get("progress", 0)
+
+        return server
+
+
     def index(self, request, instances):
         """Show a list of servers without many details."""
         coll_name = self._collection_name
@@ -122,6 +152,11 @@ class ViewBuilder(common.ViewBuilder):
         """Detailed view of a list of instance."""
         coll_name = self._collection_name + '/detail'
         return self._list_view(self.show, request, instances, coll_name)
+
+    def strato(self, request, instances):
+        """Detailed view of a list of instance."""
+        coll_name = self._collection_name + '/strato'
+        return self._list_view(self.strato_show, request, instances, coll_name)
 
     def _list_view(self, func, request, servers, coll_name):
         """Provide a view for a list of servers.
@@ -190,6 +225,19 @@ class ViewBuilder(common.ViewBuilder):
             }
         else:
             return ""
+
+    def _strato_get_flavor(self, request, instance):
+        flavor_id = instance["instance_type"]["flavorid"]
+        flavor_bookmark = self._flavor_builder._get_bookmark_link(request,
+                                                                  flavor_id,
+                                                                  "flavors")
+        return {
+            "id": str(flavor_id),
+            "links": [{
+                "rel": "bookmark",
+                "href": flavor_bookmark,
+            }],
+        }
 
     def _get_flavor(self, request, instance):
         instance_type = flavors.extract_flavor(instance)

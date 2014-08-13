@@ -662,6 +662,14 @@ def instance_get_all_by_filters(context, filters, sort_key='created_at',
                                             use_slave=use_slave)
 
 
+def strato_instance_get_all_by_filters(context, filters, sort_key='created_at',
+                                      sort_dir='desc', limit=None, marker=None):
+    """Get all instances that match all filters."""
+    return IMPL.strato_instance_get_all_by_filters(context, filters, sort_key,
+                                                   sort_dir, limit=limit,
+                                                   marker=marker)
+
+
 def instance_get_active_by_window_joined(context, begin, end=None,
                                          project_id=None, host=None,
                                          use_slave=False):

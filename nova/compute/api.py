@@ -1902,7 +1902,7 @@ class API(base.Base):
 
     def get_all(self, context, search_opts=None, sort_key='created_at',
                 sort_dir='desc', limit=None, marker=None, want_objects=False,
-                expected_attrs=None):
+                expected_attrs=None, strato=False):
         """Get all instances filtered by one of the given parameters.
 
         If there is no filter and the context is an admin, it will retrieve
@@ -1981,6 +1981,12 @@ class API(base.Base):
                     except ValueError:
                         return []
 
+        if strato:
+            return self._strato_get_instances_by_filters(context, filters,
+                                                         sort_key, sort_dir,
+                                                         limit=limit,
+                                                         marker=marker)
+
         inst_models = self._get_instances_by_filters(context, filters,
                 sort_key, sort_dir, limit=limit, marker=marker,
                 expected_attrs=expected_attrs)
@@ -2016,6 +2022,21 @@ class API(base.Base):
                         result_objs.append(instance)
                         continue
         return objects.InstanceList(objects=result_objs)
+
+    def _strato_get_instances_by_filters(self, context, filters,
+                                         sort_key, sort_dir,
+                                         limit=None,
+                                         marker=None):
+        if 'ip6' in filters or 'ip' in filters:
+            res = self.network_api.get_instance_uuids_by_ip_filter(context,
+                                                                   filters)
+            # NOTE(jkoelker) It is possible that we will get the same
+            #                instance uuid twice (one for ipv4 and ipv6)
+            uuids = set([r['instance_uuid'] for r in res])
+            filters['uuid'] = uuids
+
+        return self.db.strato_instance_get_all_by_filters(
+            context, filters, sort_key, sort_dir, limit=limit, marker=marker)
 
     def _get_instances_by_filters(self, context, filters,
                                   sort_key, sort_dir,

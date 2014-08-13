@@ -369,6 +369,10 @@ class InstanceTypes(BASE, NovaBase):
     vcpu_weight = Column(Integer)
     disabled = Column(Boolean, default=False)
     is_public = Column(Boolean, default=True)
+    instances = orm.relationship(Instance,
+                                 backref=orm.backref('instance_type'),
+                                 foreign_keys=id,
+                                 primaryjoin=id == Instance.instance_type_id)
 
 
 class Volume(BASE, NovaBase):
