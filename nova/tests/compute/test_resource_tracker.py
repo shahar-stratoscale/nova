@@ -21,7 +21,7 @@ import mock
 from oslo.config import cfg
 
 from nova.compute import flavors
-from nova.compute import resource_tracker
+from nova.tests.compute import no_arie_resource_tracker
 from nova.compute import resources
 from nova.compute import task_states
 from nova.compute import vm_states
@@ -352,7 +352,7 @@ class BaseTestCase(test.TestCase):
 
         driver = self._driver()
 
-        tracker = resource_tracker.ResourceTracker(host, driver, node)
+        tracker = no_arie_resource_tracker.NoArieResourceTracker(host, driver, node)
         tracker.ext_resources_handler = \
             resources.ResourceHandler(RESOURCE_NAMES, True)
         return tracker
