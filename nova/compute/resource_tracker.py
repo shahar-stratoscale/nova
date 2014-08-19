@@ -86,6 +86,9 @@ class ResourceTracker(object):
         self.notifier = rpc.get_notifier()
         self.old_resources = {}
         self.scheduler_client = scheduler_client.SchedulerClient()
+        # Patched by Arie to disable resource tracker
+        self.arieMode = True
+        self.isDisabled  = False
 
     @utils.synchronized(COMPUTE_RESOURCE_SEMAPHORE)
     def instance_claim(self, context, instance_ref, limits=None):
@@ -280,7 +283,8 @@ class ResourceTracker(object):
 
     @property
     def disabled(self):
-        return self.compute_node is None
+        # Patched by Arie to disable resource tracker
+        return self.compute_node is None or (self.arieMode and self.isDisabled)
 
     def _get_host_metrics(self, context, nodename):
         """Get the metrics from monitors and
@@ -311,6 +315,15 @@ class ResourceTracker(object):
         the hypervisor layer yet.
         """
         LOG.audit(_("Auditing locally available compute resources"))
+        # Patched by Arie to disable resource tracker
+        if self.arieMode:
+            # Important Note: Resource tracker must run once to save the comoute node info to db
+            if not self.isDisabled:
+                LOG.audit(_("First run of resource tracker"))
+                self.isDisabled = True
+            else:
+                LOG.audit(_("Resource tracker is disabled by Stratoscale"))
+                return
         resources = self.driver.get_available_resource(self.nodename)
 
         if not resources:
