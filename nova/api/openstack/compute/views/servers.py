@@ -127,6 +127,8 @@ class ViewBuilder(common.ViewBuilder):
                 "created": timeutils.isotime(instance["created_at"]),
                 "updated": timeutils.isotime(instance["updated_at"]),
                 "OS-EXT-SRV-ATTR:host": instance["host"],
+                "OS-EXT-SRV-ATTR:instance_name": instance["name"],
+                "OS-EXT-SRV-ATTR:hypervisor_hostname": instance["node"],
                 "links": self._get_links(request,
                                          instance["uuid"],
                                          self._collection_name),
