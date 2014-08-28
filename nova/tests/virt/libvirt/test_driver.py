@@ -1414,13 +1414,13 @@ class LibvirtConnTestCase(test.TestCase):
                 self.assertEqual(cfg.clock.timers[1].tickpolicy,
                                       "catchup")
                 if expect_hpet:
-                    self.assertEqual(3, len(cfg.clock.timers))
-                    self.assertIsInstance(cfg.clock.timers[2],
+                    self.assertEqual(4, len(cfg.clock.timers))
+                    self.assertIsInstance(cfg.clock.timers[3],
                                           vconfig.LibvirtConfigGuestTimer)
-                    self.assertEqual('hpet', cfg.clock.timers[2].name)
-                    self.assertFalse(cfg.clock.timers[2].present)
+                    self.assertEqual('hpet', cfg.clock.timers[3].name)
+                    self.assertFalse(cfg.clock.timers[3].present)
                 else:
-                    self.assertEqual(2, len(cfg.clock.timers))
+                    self.assertEqual(3, len(cfg.clock.timers))
 
     def test_get_guest_config_windows(self):
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), True)

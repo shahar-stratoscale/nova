@@ -3918,8 +3918,13 @@ class LibvirtDriver(driver.ComputeDriver):
             tmrtc.name = "rtc"
             tmrtc.tickpolicy = "catchup"
 
+            tmkvmclock = vconfig.LibvirtConfigGuestTimer()
+            tmkvmclock.name = "kvmclock"
+            tmkvmclock.present = False
+
             clk.add_timer(tmpit)
             clk.add_timer(tmrtc)
+            clk.add_timer(tmkvmclock)
 
             guestarch = libvirt_utils.get_arch(image_meta)
             if guestarch in (arch.I686, arch.X86_64):
