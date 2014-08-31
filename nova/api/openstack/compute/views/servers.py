@@ -134,11 +134,6 @@ class ViewBuilder(common.ViewBuilder):
                                          self._collection_name),
             },
         }
-        if server["server"]["status"] in self._fault_statuses:
-            _inst_fault = self._get_fault(request, instance)
-            if _inst_fault:
-                server['server']['fault'] = _inst_fault
-
         if server["server"]["status"] in self._progress_statuses:
             server["server"]["progress"] = instance.get("progress", 0)
 
