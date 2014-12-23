@@ -436,7 +436,7 @@ def service_get(context, service_id, with_compute_node=False,
                         use_slave=use_slave)
 
 
-@require_admin_context
+@require_context
 def service_get_all(context, disabled=None):
     query = model_query(context, models.Service)
 
