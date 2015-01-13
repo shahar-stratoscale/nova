@@ -95,8 +95,10 @@ class DbDriver(api.ServiceGroupDriver):
             report_count = service.service_ref['report_count'] + 1
             state_catalog['report_count'] = report_count
 
-            service.service_ref = self.conductor_api.service_update(ctxt,
+            new_service_ref = self.conductor_api.service_update(ctxt,
                     service.service_ref, state_catalog)
+            if new_service_ref is not None:
+                service.service_ref = new_service_ref
 
             # TODO(termie): make this pattern be more elegant.
             if getattr(service, 'model_disconnected', False):
