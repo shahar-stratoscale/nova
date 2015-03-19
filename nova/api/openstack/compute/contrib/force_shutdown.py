@@ -15,7 +15,7 @@
 from nova.api.openstack import extensions
 
 
-class Forced_shutdown(extensions.ExtensionDescriptor):
+class Force_shutdown(extensions.ExtensionDescriptor):
     """Adds force shutdown option to stop, shelve, rescue and resize."""
 
     name = "ForceShutdown"
