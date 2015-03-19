@@ -39,6 +39,7 @@ import tempfile
 import threading
 import time
 import uuid
+import six
 
 import eventlet
 from eventlet import greenio
