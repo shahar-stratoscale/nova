@@ -1752,7 +1752,7 @@ class API(base.Base):
             system_metadata=sys_meta)
 
     def _do_delete(self, context, instance, bdms, reservations=None,
-                   local=False):
+                   local=False, clean_shutdown=True):
         if local:
             instance.vm_state = vm_states.DELETED
             instance.task_state = None
@@ -1760,7 +1760,8 @@ class API(base.Base):
             instance.save()
         else:
             self.compute_rpcapi.terminate_instance(context, instance, bdms,
-                                                   reservations=reservations)
+                                                   reservations=reservations,
+                                                   clean_shutdown=clean_shutdown)
 
     def _do_soft_delete(self, context, instance, bdms, reservations=None,
                         local=False):
@@ -1788,8 +1789,8 @@ class API(base.Base):
                      task_state=task_states.SOFT_DELETING,
                      deleted_at=timeutils.utcnow())
 
-    def _delete_instance(self, context, instance):
-        self._delete(context, instance, 'delete', self._do_delete,
+    def _delete_instance(self, context, instance, clean_shutdown=True):
+        self._delete(context, instance, 'delete', functools.partial(self._do_delete, clean_shutdown=clean_shutdown),
                      task_state=task_states.DELETING)
 
     @wrap_check_policy
@@ -1797,10 +1798,10 @@ class API(base.Base):
     @check_instance_cell
     @check_instance_state(vm_state=None, task_state=None,
                           must_have_launched=False)
-    def delete(self, context, instance):
+    def delete(self, context, instance, clean_shutdown=True):
         """Terminate an instance."""
         LOG.debug("Going to try to terminate instance", instance=instance)
-        self._delete_instance(context, instance)
+        self._delete_instance(context, instance, clean_shutdown=clean_shutdown)
 
     @wrap_check_policy
     @check_instance_lock

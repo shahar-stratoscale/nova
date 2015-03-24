@@ -600,7 +600,7 @@ class ComputeVirtAPI(virtapi.VirtAPI):
 class ComputeManager(manager.Manager):
     """Manages the running instances from creation to destruction."""
 
-    target = messaging.Target(version='3.35')
+    target = messaging.Target(version='3.35.1')
 
     # How long to wait in seconds before re-issuing a shutdown
     # signal to a instance during power off.  The overall
@@ -2357,7 +2357,8 @@ class ComputeManager(manager.Manager):
 
     def _shutdown_instance(self, context, instance,
                            bdms, requested_networks=None, notify=True,
-                           try_deallocate_networks=True):
+                           try_deallocate_networks=True,
+                           clean_shutdown=True):
         """Shutdown an instance on this host.
 
         :param:context: security context
@@ -2375,6 +2376,8 @@ class ComputeManager(manager.Manager):
         LOG.audit(_('%(action_str)s instance') % {'action_str': 'Terminating'},
                   context=context, instance=instance)
 
+        timeout, retry_interval = self._get_power_off_values(context,
+                                        instance, clean_shutdown)
         if notify:
             self._notify_about_instance_usage(context, instance,
                                               "shutdown.start")
@@ -2390,7 +2393,7 @@ class ComputeManager(manager.Manager):
         #                want to keep ip allocated for certain failures
         try:
             self.driver.destroy(context, instance, network_info,
-                    block_device_info)
+                    block_device_info, timeout=timeout, retry_interval=retry_interval)
         except exception.InstancePowerOffFailure:
             # if the instance can't power off, don't release the ip
             with excutils.save_and_reraise_exception():
@@ -2447,7 +2450,7 @@ class ComputeManager(manager.Manager):
             six.reraise(exc_info[0], exc_info[1], exc_info[2])
 
     @hooks.add_hook("delete_instance")
-    def _delete_instance(self, context, instance, bdms, quotas):
+    def _delete_instance(self, context, instance, bdms, quotas, clean_shutdown=True):
         """Delete an instance on this host.  Commit or rollback quotas
         as necessary.
         """
@@ -2471,7 +2474,7 @@ class ComputeManager(manager.Manager):
             instance.info_cache.delete()
             self._notify_about_instance_usage(context, instance,
                                               "delete.start")
-            self._shutdown_instance(context, instance, bdms)
+            self._shutdown_instance(context, instance, bdms, clean_shutdown=clean_shutdown)
             # NOTE(vish): We have already deleted the instance, so we have
             #             to ignore problems cleaning up the volumes. It
             #             would be nice to let the user know somehow that
@@ -2506,7 +2509,7 @@ class ComputeManager(manager.Manager):
     @reverts_task_state
     @wrap_instance_event
     @wrap_instance_fault
-    def terminate_instance(self, context, instance, bdms, reservations):
+    def terminate_instance(self, context, instance, bdms, reservations, clean_shutdown=True):
         """Terminate an instance on this host."""
         # NOTE (ndipanov): If we get non-object BDMs, just get them from the
         # db again, as this means they are sent in the old format and we want
@@ -2525,7 +2528,7 @@ class ComputeManager(manager.Manager):
         @utils.synchronized(instance['uuid'])
         def do_terminate_instance(instance, bdms):
             try:
-                self._delete_instance(context, instance, bdms, quotas)
+                self._delete_instance(context, instance, bdms, quotas, clean_shutdown=clean_shutdown)
             except exception.InstanceNotFound:
                 LOG.info(_("Instance disappeared during terminate"),
                          instance=instance)

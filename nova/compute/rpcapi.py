@@ -274,6 +274,7 @@ class ComputeAPI(object):
         * 3.33 - Make build_and_run_instance() take a NetworkRequestList object
         * 3.34 - Add get_serial_console method
         * 3.35 - Make reserve_block_device_name return a BDM object
+        * 3.35.1 - Add clean_shutdown to terminate_instance
 
         ... Juno supports message version 3.35.  So, any changes to
         existing methods in 3.x after that point should be done such that they
@@ -832,13 +833,18 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'suspend_instance', instance=instance)
 
-    def terminate_instance(self, ctxt, instance, bdms, reservations=None):
-        version = '3.22'
+    def terminate_instance(self, ctxt, instance, bdms, reservations=None, clean_shutdown=True):
+        msg_args = {}
+        if self.client.can_send_version('3.35.1'):
+            version = '3.35.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        else:
+            version = '3.22'
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
         cctxt.cast(ctxt, 'terminate_instance',
                    instance=instance, bdms=bdms,
-                   reservations=reservations)
+                   reservations=reservations, **msg_args)
 
     def unpause_instance(self, ctxt, instance):
         version = '3.0'
