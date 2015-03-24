@@ -241,7 +241,11 @@ def get_value_from_system_metadata(instance, key, type, default):
     @param type: The python type the value is be returned as
     @param default: The value to return if key is not set or not the right type
     """
-    value = instance.system_metadata.get(key, default)
+    if hasattr(instance, 'system_metadata'):
+        system_metadata = instance.system_metadata
+    else:
+        system_metadata = instance['system_metadata']
+    value = system_metadata.get(key, default)
     try:
         return type(value)
     except ValueError:

@@ -1059,7 +1059,10 @@ class LibvirtDriver(driver.ComputeDriver):
             self._destroy(instance)
 
     def destroy(self, context, instance, network_info, block_device_info=None,
-                destroy_disks=True, migrate_data=None):
+                destroy_disks=True, migrate_data=None,
+                timeout=0, retry_interval=0):
+        if timeout:
+            self._clean_shutdown(instance, timeout, retry_interval)
         self._destroy(instance)
         self.cleanup(context, instance, network_info, block_device_info,
                      destroy_disks, migrate_data)

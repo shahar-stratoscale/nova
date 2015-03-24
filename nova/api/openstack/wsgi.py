@@ -939,7 +939,7 @@ class Resource(wsgi.Application):
         # Now, deserialize the request body...
         try:
             contents = {}
-            if self._should_have_body(request):
+            if self._should_have_body(request) or getattr(meth, 'wsgi_expects_body', False):
                 # allow empty body with PUT and POST
                 if request.content_length == 0:
                     contents = {'body': None}
@@ -1072,6 +1072,11 @@ def action(name):
         func.wsgi_action = name
         return func
     return decorator
+
+
+def expects_body(func):
+    func.wsgi_expects_body = True
+    return func
 
 
 def extends(*args, **kwargs):

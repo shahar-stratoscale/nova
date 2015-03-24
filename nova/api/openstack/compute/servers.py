@@ -1034,7 +1034,7 @@ class Controller(wsgi.Controller):
 
         return self._add_location(robj)
 
-    def _delete(self, context, req, instance_uuid):
+    def _delete(self, context, req, instance_uuid, clean_shutdown=True):
         instance = self._get_server(context, req, instance_uuid)
         if CONF.reclaim_instance_interval:
             try:
@@ -1043,9 +1043,9 @@ class Controller(wsgi.Controller):
                 # Note(yufang521247): instance which has never been active
                 # is not allowed to be soft_deleted. Thus we have to call
                 # delete() to clean up the instance.
-                self.compute_api.delete(context, instance)
+                self.compute_api.delete(context, instance, clean_shutdown=clean_shutdown)
         else:
-            self.compute_api.delete(context, instance)
+            self.compute_api.delete(context, instance, clean_shutdown=clean_shutdown)
 
     @wsgi.serializers(xml=ServerTemplate)
     def update(self, req, id, body):
@@ -1215,10 +1215,17 @@ class Controller(wsgi.Controller):
         return webob.Response(status_int=202)
 
     @wsgi.response(204)
-    def delete(self, req, id):
+    @wsgi.expects_body
+    def delete(self, req, id, body):
         """Destroys a server."""
+
+        clean_shutdown = body.get('clean_shutdown', True)
+        if not isinstance(clean_shutdown, bool):
+            msg = _("Argument 'clean_shutdown' for delete must be a Boolean")
+            raise exc.HTTPBadRequest(explanation=msg)
+
         try:
-            self._delete(req.environ['nova.context'], req, id)
+            self._delete(req.environ['nova.context'], req, id, clean_shutdown=clean_shutdown)
         except exception.NotFound:
             msg = _("Instance could not be found")
             raise exc.HTTPNotFound(explanation=msg)
