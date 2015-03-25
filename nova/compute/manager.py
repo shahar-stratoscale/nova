@@ -2358,7 +2358,7 @@ class ComputeManager(manager.Manager):
     def _shutdown_instance(self, context, instance,
                            bdms, requested_networks=None, notify=True,
                            try_deallocate_networks=True,
-                           clean_shutdown=True):
+                           clean_shutdown=False):
         """Shutdown an instance on this host.
 
         :param:context: security context
@@ -2450,7 +2450,7 @@ class ComputeManager(manager.Manager):
             six.reraise(exc_info[0], exc_info[1], exc_info[2])
 
     @hooks.add_hook("delete_instance")
-    def _delete_instance(self, context, instance, bdms, quotas, clean_shutdown=True):
+    def _delete_instance(self, context, instance, bdms, quotas, clean_shutdown=False):
         """Delete an instance on this host.  Commit or rollback quotas
         as necessary.
         """
@@ -2509,7 +2509,7 @@ class ComputeManager(manager.Manager):
     @reverts_task_state
     @wrap_instance_event
     @wrap_instance_fault
-    def terminate_instance(self, context, instance, bdms, reservations, clean_shutdown=True):
+    def terminate_instance(self, context, instance, bdms, reservations, clean_shutdown=False):
         """Terminate an instance on this host."""
         # NOTE (ndipanov): If we get non-object BDMs, just get them from the
         # db again, as this means they are sent in the old format and we want
