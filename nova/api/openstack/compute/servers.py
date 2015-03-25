@@ -1034,7 +1034,7 @@ class Controller(wsgi.Controller):
 
         return self._add_location(robj)
 
-    def _delete(self, context, req, instance_uuid, clean_shutdown=True):
+    def _delete(self, context, req, instance_uuid, clean_shutdown=False):
         instance = self._get_server(context, req, instance_uuid)
         if CONF.reclaim_instance_interval:
             try:
@@ -1219,7 +1219,7 @@ class Controller(wsgi.Controller):
     def delete(self, req, id, body):
         """Destroys a server."""
 
-        clean_shutdown = body.get('clean_shutdown', True)
+        clean_shutdown = body.get('clean_shutdown', False)
         if not isinstance(clean_shutdown, bool):
             msg = _("Argument 'clean_shutdown' for delete must be a Boolean")
             raise exc.HTTPBadRequest(explanation=msg)

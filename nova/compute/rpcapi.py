@@ -833,7 +833,7 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'suspend_instance', instance=instance)
 
-    def terminate_instance(self, ctxt, instance, bdms, reservations=None, clean_shutdown=True):
+    def terminate_instance(self, ctxt, instance, bdms, reservations=None, clean_shutdown=False):
         msg_args = {}
         if self.client.can_send_version('3.35.1'):
             version = '3.35.1'
