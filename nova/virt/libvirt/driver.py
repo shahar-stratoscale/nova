@@ -4179,6 +4179,9 @@ class LibvirtDriver(driver.ComputeDriver):
             instance_dir = libvirt_utils.get_instance_path(instance)
             xml_path = os.path.join(instance_dir, 'libvirt.xml')
             libvirt_utils.write_to_file(xml_path, xml)
+            inst_type = flavors.extract_flavor(instance)
+            flavorid_path = os.path.join(instance_dir, 'flavorid.txt')
+            libvirt_utils.write_to_file(flavorid_path, inst_type['flavorid'])
 
         LOG.debug('End _get_guest_xml xml=%(xml)s',
                   {'xml': xml}, instance=instance)
