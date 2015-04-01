@@ -167,13 +167,14 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         dest = None
         block_migration = False
         disk_over_commit = False
+        pclm = "pclm"
 
         self.mox.StubOutWithMock(self.manager, '_schedule_live_migration')
         self.mox.StubOutWithMock(compute_utils, 'add_instance_fault_from_exc')
         self.mox.StubOutWithMock(db, 'instance_update_and_get_original')
 
         self.manager._schedule_live_migration(self.context,
-                    inst, dest, block_migration, disk_over_commit).AndRaise(
+                    inst, dest, block_migration, disk_over_commit, pclm).AndRaise(
                     exception.NoValidHost(reason=""))
         db.instance_update_and_get_original(self.context, inst["uuid"],
                                 {"vm_state": inst['vm_state'],
@@ -190,7 +191,7 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         self.assertRaises(exception.NoValidHost,
                           self.manager.live_migration,
                           self.context, inst, dest, block_migration,
-                          disk_over_commit)
+                          disk_over_commit, pclm)
 
     def test_live_migration_compute_service_notavailable(self):
         inst = {"uuid": "fake-instance-id",
@@ -200,13 +201,14 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         dest = 'fake_host'
         block_migration = False
         disk_over_commit = False
+        pclm = "pclm"
 
         self.mox.StubOutWithMock(self.manager, '_schedule_live_migration')
         self.mox.StubOutWithMock(compute_utils, 'add_instance_fault_from_exc')
         self.mox.StubOutWithMock(db, 'instance_update_and_get_original')
 
         self.manager._schedule_live_migration(self.context,
-                    inst, dest, block_migration, disk_over_commit).AndRaise(
+                    inst, dest, block_migration, disk_over_commit, pclm).AndRaise(
                     exception.ComputeServiceUnavailable(host="src"))
         db.instance_update_and_get_original(self.context, inst["uuid"],
                                 {"vm_state": inst['vm_state'],
@@ -223,18 +225,18 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         self.assertRaises(exception.ComputeServiceUnavailable,
                           self.manager.live_migration,
                           self.context, inst, dest, block_migration,
-                          disk_over_commit)
+                          disk_over_commit, pclm)
 
     def test_live_migrate(self):
         instance = {'host': 'h'}
         self.mox.StubOutClassWithMocks(live_migrate, "LiveMigrationTask")
         task = live_migrate.LiveMigrationTask(self.context, instance,
-                    "dest", "bm", "doc")
+                    "dest", "bm", "doc", "pclm")
         task.execute()
 
         self.mox.ReplayAll()
         self.manager.live_migration(self.context, instance, "dest",
-                                    "bm", "doc")
+                                    "bm", "doc", "pclm")
 
     def test_live_migration_set_vmstate_error(self):
         inst = {"uuid": "fake-instance-id",
@@ -243,13 +245,14 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         dest = 'fake_host'
         block_migration = False
         disk_over_commit = False
+        pclm = "pclm"
 
         self.mox.StubOutWithMock(self.manager, '_schedule_live_migration')
         self.mox.StubOutWithMock(compute_utils, 'add_instance_fault_from_exc')
         self.mox.StubOutWithMock(db, 'instance_update_and_get_original')
 
         self.manager._schedule_live_migration(self.context,
-                    inst, dest, block_migration, disk_over_commit).AndRaise(
+                    inst, dest, block_migration, disk_over_commit, pclm).AndRaise(
                     ValueError)
         db.instance_update_and_get_original(self.context, inst["uuid"],
                                 {"vm_state": vm_states.ERROR,
@@ -264,7 +267,7 @@ class SchedulerManagerTestCase(test.NoDBTestCase):
         self.assertRaises(ValueError,
                           self.manager.live_migration,
                           self.context, inst, dest, block_migration,
-                          disk_over_commit)
+                          disk_over_commit, pclm)
 
     def test_prep_resize_no_valid_host_back_in_active_state(self):
         fake_instance_uuid = 'fake-instance-id'

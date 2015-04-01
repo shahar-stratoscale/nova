@@ -1280,8 +1280,9 @@ class CellsTargetedMethodsTestCase(test.TestCase):
     def test_live_migrate_instance(self):
         kwargs = dict(block_migration='fake-block-mig',
                       disk_over_commit='fake-commit',
-                      host_name='fake-host')
-        expected_args = ('fake-block-mig', 'fake-commit', 'fake-host')
+                      host_name='fake-host',
+                      pclm='fake-pclm')
+        expected_args = ('fake-block-mig', 'fake-commit', 'fake-host', 'fake-pclm')
         self._test_instance_action_method('live_migrate', (), kwargs,
                                           expected_args, {}, False)
 

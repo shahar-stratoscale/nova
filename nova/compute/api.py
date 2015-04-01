@@ -1658,7 +1658,7 @@ class API(base.Base):
             system_metadata=sys_meta)
 
     def _do_delete(self, context, instance, bdms, reservations=None,
-                   local=False):
+                   local=False, clean_shutdown=False):
         if local:
             instance.vm_state = vm_states.DELETED
             instance.task_state = None
@@ -1666,7 +1666,8 @@ class API(base.Base):
             instance.save()
         else:
             self.compute_rpcapi.terminate_instance(context, instance, bdms,
-                                                   reservations=reservations)
+                                                   reservations=reservations,
+                                                   clean_shutdown=clean_shutdown)
 
     def _do_soft_delete(self, context, instance, bdms, reservations=None,
                         local=False):
@@ -1694,8 +1695,8 @@ class API(base.Base):
                      task_state=task_states.SOFT_DELETING,
                      deleted_at=timeutils.utcnow())
 
-    def _delete_instance(self, context, instance):
-        self._delete(context, instance, 'delete', self._do_delete,
+    def _delete_instance(self, context, instance, clean_shutdown=False):
+        self._delete(context, instance, 'delete', functools.partial(self._do_delete, clean_shutdown=clean_shutdown),
                      task_state=task_states.DELETING)
 
     @wrap_check_policy
@@ -1703,10 +1704,10 @@ class API(base.Base):
     @check_instance_cell
     @check_instance_state(vm_state=None, task_state=None,
                           must_have_launched=False)
-    def delete(self, context, instance):
+    def delete(self, context, instance, clean_shutdown=False):
         """Terminate an instance."""
         LOG.debug(_("Going to try to terminate instance"), instance=instance)
-        self._delete_instance(context, instance)
+        self._delete_instance(context, instance, clean_shutdown=clean_shutdown)
 
     @wrap_check_policy
     @check_instance_lock
@@ -1745,7 +1746,7 @@ class API(base.Base):
         """Force delete a previously deleted (but not reclaimed) instance."""
         self._delete_instance(context, instance)
 
-    def force_stop(self, context, instance, do_cast=True):
+    def force_stop(self, context, instance, do_cast=True, clean_shutdown=True):
         LOG.debug(_("Going to try to stop instance"), instance=instance)
 
         instance.task_state = task_states.POWERING_OFF
@@ -1754,7 +1755,8 @@ class API(base.Base):
 
         self._record_action_start(context, instance, instance_actions.STOP)
 
-        self.compute_rpcapi.stop_instance(context, instance, do_cast=do_cast)
+        self.compute_rpcapi.stop_instance(context, instance, do_cast=do_cast,
+                                          clean_shutdown=clean_shutdown)
 
     @check_instance_lock
     @check_instance_host
@@ -1762,9 +1764,9 @@ class API(base.Base):
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.RESCUED,
                                     vm_states.ERROR],
                           task_state=[None])
-    def stop(self, context, instance, do_cast=True):
+    def stop(self, context, instance, do_cast=True, clean_shutdown=True):
         """Stop an instance."""
-        self.force_stop(context, instance, do_cast)
+        self.force_stop(context, instance, do_cast, clean_shutdown)
 
     @check_instance_lock
     @check_instance_host
@@ -1811,7 +1813,7 @@ class API(base.Base):
 
     def get_all(self, context, search_opts=None, sort_key='created_at',
                 sort_dir='desc', limit=None, marker=None, want_objects=False,
-                expected_attrs=None):
+                expected_attrs=None, strato=False):
         """Get all instances filtered by one of the given parameters.
 
         If there is no filter and the context is an admin, it will retrieve
@@ -1882,6 +1884,12 @@ class API(base.Base):
                     except ValueError:
                         return []
 
+        if strato:
+            return self._strato_get_instances_by_filters(context, filters,
+                                                         sort_key, sort_dir,
+                                                         limit=limit,
+                                                         marker=marker)
+
         inst_models = self._get_instances_by_filters(context, filters,
                 sort_key, sort_dir, limit=limit, marker=marker,
                 expected_attrs=expected_attrs)
@@ -1895,6 +1903,21 @@ class API(base.Base):
             instances.append(obj_base.obj_to_primitive(inst_model))
 
         return instances
+
+    def _strato_get_instances_by_filters(self, context, filters,
+                                         sort_key, sort_dir,
+                                         limit=None,
+                                         marker=None):
+        if 'ip6' in filters or 'ip' in filters:
+            res = self.network_api.get_instance_uuids_by_ip_filter(context,
+                                                                   filters)
+            # NOTE(jkoelker) It is possible that we will get the same
+            #                instance uuid twice (one for ipv4 and ipv6)
+            uuids = set([r['instance_uuid'] for r in res])
+            filters['uuid'] = uuids
+
+        return self.db.strato_instance_get_all_by_filters(
+            context, filters, sort_key, sort_dir, limit=limit, marker=marker)
 
     def _get_instances_by_filters(self, context, filters,
                                   sort_key, sort_dir,
@@ -3006,7 +3029,7 @@ class API(base.Base):
     @check_instance_cell
     @check_instance_state(vm_state=[vm_states.ACTIVE])
     def live_migrate(self, context, instance, block_migration,
-                     disk_over_commit, host_name):
+                     disk_over_commit, host_name, pclm):
         """Migrate a server lively to a new host."""
         LOG.debug(_("Going to try to live migrate instance to %s"),
                   host_name or "another host", instance=instance)
@@ -3016,7 +3039,7 @@ class API(base.Base):
 
         self.compute_task_api.live_migrate_instance(context, instance,
                 host_name, block_migration=block_migration,
-                disk_over_commit=disk_over_commit)
+                disk_over_commit=disk_over_commit, pclm=pclm)
 
     @check_instance_state(vm_state=[vm_states.ACTIVE, vm_states.STOPPED],
                           task_state=[None])

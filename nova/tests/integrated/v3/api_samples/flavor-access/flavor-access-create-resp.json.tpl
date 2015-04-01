@@ -15,6 +15,7 @@
         "name": "%(flavor_name)s",
         "flavor-access:is_public": false,
         "ram": 1024,
+        "extra_specs": {},
         "vcpus": 2,
         "disabled": false,
         "ephemeral": 0,

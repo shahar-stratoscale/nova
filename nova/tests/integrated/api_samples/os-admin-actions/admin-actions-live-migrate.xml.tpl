@@ -3,4 +3,5 @@
         <host>%(hostname)s</host>
         <block_migration>false</block_migration>
         <disk_over_commit>false</disk_over_commit>
+        <pclm>%(pclm)s</pclm>
     </os-migrateLive>

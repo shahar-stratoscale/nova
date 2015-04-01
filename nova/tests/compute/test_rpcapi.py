@@ -154,14 +154,14 @@ class ComputeRpcAPITestCase(test.TestCase):
         self._test_compute_api('check_can_live_migrate_destination', 'call',
                 instance=self.fake_instance,
                 destination='dest', block_migration=True,
-                disk_over_commit=True)
+                disk_over_commit=True, pclm='mlcp')
 
         # NOTE(russellb) Havana compat
         self.flags(compute='havana', group='upgrade_levels')
         self._test_compute_api('check_can_live_migrate_destination', 'call',
                 instance=self.fake_instance,
                 destination='dest', block_migration=True,
-                disk_over_commit=True, version='2.38')
+                disk_over_commit=True, pclm="pclm", version='2.38')
 
     def test_check_can_live_migrate_source(self):
         self._test_compute_api('check_can_live_migrate_source', 'call',
@@ -365,14 +365,14 @@ class ComputeRpcAPITestCase(test.TestCase):
     def test_live_migration(self):
         self._test_compute_api('live_migration', 'cast',
                 instance=self.fake_instance, dest='dest',
-                block_migration='blockity_block', host='tsoh',
+                block_migration='blockity_block', host='tsoh', pclm='mlcp',
                 migrate_data={})
 
         # NOTE(russellb) Havana compat
         self.flags(compute='havana', group='upgrade_levels')
         self._test_compute_api('live_migration', 'cast',
                 instance=self.fake_instance, dest='dest',
-                block_migration='blockity_block', host='tsoh',
+                block_migration='blockity_block', host='tsoh', pclm='mlcp',
                 migrate_data={}, version='2.0')
 
     def test_post_live_migration_at_destination(self):

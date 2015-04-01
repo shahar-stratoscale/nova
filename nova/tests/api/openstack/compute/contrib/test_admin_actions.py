@@ -203,8 +203,9 @@ class AdminActionsTest(CommonMixin, test.NoDBTestCase):
         body_map = {'os-migrateLive':
                         {'host': 'hostname',
                          'block_migration': False,
-                         'disk_over_commit': False}}
-        args_map = {'os-migrateLive': ((False, False, 'hostname'), {})}
+                         'disk_over_commit': False,
+                         'pclm': "pclm"}}
+        args_map = {'os-migrateLive': ((False, False, 'hostname', "pclm"), {})}
 
         for action in actions:
             method = method_translations.get(action)
@@ -233,7 +234,8 @@ class AdminActionsTest(CommonMixin, test.NoDBTestCase):
                     'os-migrateLive':
                                   {'host': 'hostname',
                                    'block_migration': False,
-                                   'disk_over_commit': False}}
+                                   'disk_over_commit': False,
+                                   'pclm': "pclm"}}
         for action in actions:
             self._test_non_existing_instance(action,
                                              body_map=body_map)
@@ -269,7 +271,7 @@ class AdminActionsTest(CommonMixin, test.NoDBTestCase):
         self.mox.StubOutWithMock(self.compute_api, 'live_migrate')
         instance = self._stub_instance_get()
         self.compute_api.live_migrate(self.context, instance, False,
-                                      False, 'hostname')
+                                      False, 'hostname', "pclm")
 
         self.mox.ReplayAll()
 
@@ -280,33 +282,38 @@ class AdminActionsTest(CommonMixin, test.NoDBTestCase):
     def test_migrate_live_enabled(self):
         param = {'host': 'hostname',
                  'block_migration': False,
-                 'disk_over_commit': False}
+                 'disk_over_commit': False,
+                 'pclm': "pclm"}
         self._test_migrate_live_succeeded(param)
 
     def test_migrate_live_enabled_with_string_param(self):
         param = {'host': 'hostname',
                  'block_migration': "False",
-                 'disk_over_commit': "False"}
+                 'disk_over_commit': "False",
+                 'pclm': "pclm"}
         self._test_migrate_live_succeeded(param)
 
     def test_migrate_live_missing_dict_param(self):
         body = {'os-migrateLive': {'dummy': 'hostname',
                                    'block_migration': False,
-                                   'disk_over_commit': False}}
+                                   'disk_over_commit': False,
+                                   'pclm': "pclm"}}
         res = self._make_request('/servers/FAKE/action', body)
         self.assertEqual(400, res.status_int)
 
     def test_migrate_live_with_invalid_block_migration(self):
         body = {'os-migrateLive': {'host': 'hostname',
                                    'block_migration': "foo",
-                                   'disk_over_commit': False}}
+                                   'disk_over_commit': False,
+                                   'pclm': "pclm"}}
         res = self._make_request('/servers/FAKE/action', body)
         self.assertEqual(400, res.status_int)
 
     def test_migrate_live_with_invalid_disk_over_commit(self):
         body = {'os-migrateLive': {'host': 'hostname',
                                    'block_migration': False,
-                                   'disk_over_commit': "foo"}}
+                                   'disk_over_commit': "foo",
+                                   'pclm': "pclm"}}
         res = self._make_request('/servers/FAKE/action', body)
         self.assertEqual(400, res.status_int)
 
@@ -316,7 +323,7 @@ class AdminActionsTest(CommonMixin, test.NoDBTestCase):
 
         instance = self._stub_instance_get(uuid=uuid)
         self.compute_api.live_migrate(self.context, instance, False,
-                                      False, 'hostname').AndRaise(fake_exc)
+                                      False, 'hostname', "pclm").AndRaise(fake_exc)
 
         self.mox.ReplayAll()
 
@@ -324,7 +331,8 @@ class AdminActionsTest(CommonMixin, test.NoDBTestCase):
                                  {'os-migrateLive':
                                   {'host': 'hostname',
                                    'block_migration': False,
-                                   'disk_over_commit': False}})
+                                   'disk_over_commit': False,
+                                   'pclm': "pclm"}})
         self.assertEqual(400, res.status_int)
         self.assertIn(unicode(fake_exc), res.body)
 

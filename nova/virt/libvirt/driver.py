@@ -51,6 +51,7 @@ import tempfile
 import threading
 import time
 import uuid
+import six
 
 from eventlet import greenio
 from eventlet import greenthread
@@ -165,6 +166,11 @@ libvirt_opts = [
                     '(any included "%s" is replaced with '
                     'the migration target hostname)',
                deprecated_group='DEFAULT'),
+    cfg.StrOpt('pclm_uri',
+               default="pclm:%s:%s",
+               help='PCLM URI '
+                    '1st "%s" is replaced with migration source NodeId'
+                    '2nd "%s" is replaced with target hostname)'),
     cfg.StrOpt('live_migration_flag',
                default='VIR_MIGRATE_UNDEFINE_SOURCE, VIR_MIGRATE_PEER2PEER',
                help='Migration flags to be set for live migration',
@@ -206,6 +212,8 @@ libvirt_opts = [
                       'LibvirtFibreChannelVolumeDriver',
                   'scality='
                       'nova.virt.libvirt.volume.LibvirtScalityVolumeDriver',
+                  'mancala='
+                      'nova.virt.libvirt.volume.LibvirtMancalaVolumeDriver',
                   ],
                 help='Libvirt handlers for remote volumes.',
                 deprecated_name='libvirt_volume_drivers',
@@ -956,7 +964,9 @@ class LibvirtDriver(driver.ComputeDriver):
             self._destroy(instance)
 
     def destroy(self, context, instance, network_info, block_device_info=None,
-                destroy_disks=True):
+                destroy_disks=True, timeout=0, retry_interval=0):
+        if timeout:
+            self._clean_shutdown(instance, timeout, retry_interval)
         self._destroy(instance)
         self.cleanup(context, instance, network_info, block_device_info,
                      destroy_disks)
@@ -2148,8 +2158,85 @@ class LibvirtDriver(driver.ComputeDriver):
         dom = self._lookup_by_name(instance['name'])
         dom.resume()
 
-    def power_off(self, instance):
+    def _clean_shutdown(self, instance, timeout, retry_interval):
+        """Attempt to shutdown the instance gracefully.
+
+        :param instance: The instance to be shutdown
+        :param timeout: How long to wait in seconds for the instance to
+                        shutdown
+        :param retry_interval: How often in seconds to signal the instance
+                               to shutdown while waiting
+
+        :returns: True if the shutdown succeeded
+        """
+
+        # List of states that represent a shutdown instance
+        SHUTDOWN_STATES = [power_state.SHUTDOWN,
+                           power_state.CRASHED]
+
+        try:
+            dom = self._lookup_by_name(instance["name"])
+        except exception.InstanceNotFound:
+            # If the instance has gone then we don't need to
+            # wait for it to shutdown
+            return True
+
+        (state, _max_mem, _mem, _cpus, _t) = dom.info()
+        state = LIBVIRT_POWER_STATE[state]
+        if state in SHUTDOWN_STATES:
+            LOG.info(_("Instance already shutdown."),
+                     instance=instance)
+            return True
+
+        LOG.debug("Shutting down instance from state %s", state,
+                  instance=instance)
+        dom.shutdown()
+        retry_countdown = retry_interval
+
+        for sec in six.moves.range(timeout):
+
+            dom = self._lookup_by_name(instance["name"])
+            (state, _max_mem, _mem, _cpus, _t) = dom.info()
+            state = LIBVIRT_POWER_STATE[state]
+
+            if state in SHUTDOWN_STATES:
+                LOG.info(_("Instance shutdown successfully after %d "
+                              "seconds."), sec, instance=instance)
+                return True
+
+            # Note(PhilD): We can't assume that the Guest was able to process
+            #              any previous shutdown signal (for example it may
+            #              have still been startingup, so within the overall
+            #              timeout we re-trigger the shutdown every
+            #              retry_interval
+            if retry_countdown == 0:
+                retry_countdown = retry_interval
+                # Instance could shutdown at any time, in which case we
+                # will get an exception when we call shutdown
+                try:
+                    LOG.debug("Instance in state %s after %d seconds - "
+                              "resending shutdown", state, sec,
+                              instance=instance)
+                    dom.shutdown()
+                except libvirt.libvirtError:
+                    # Assume this is because its now shutdown, so loop
+                    # one more time to clean up.
+                    LOG.debug("Ignoring libvirt exception from shutdown "
+                              "request.", instance=instance)
+                    continue
+            else:
+                retry_countdown -= 1
+
+            time.sleep(1)
+
+        LOG.info(_("Instance failed to shutdown in %d seconds."),
+                 timeout, instance=instance)
+        return False
+
+    def power_off(self, instance, timeout=0, retry_interval=0):
         """Power off the specified instance."""
+        if timeout:
+            self._clean_shutdown(instance, timeout, retry_interval)
         self._destroy(instance)
 
     def power_on(self, context, instance, network_info,
@@ -3259,8 +3346,13 @@ class LibvirtDriver(driver.ComputeDriver):
             tmrtc.name = "rtc"
             tmrtc.tickpolicy = "catchup"
 
+            tmkvmclock = vconfig.LibvirtConfigGuestTimer()
+            tmkvmclock.name = "kvmclock"
+            tmkvmclock.present = False
+
             clk.add_timer(tmpit)
             clk.add_timer(tmrtc)
+            clk.add_timer(tmkvmclock)
 
             arch = libvirt_utils.get_arch(image_meta)
             if arch in ("i686", "x86_64"):
@@ -3476,6 +3568,9 @@ class LibvirtDriver(driver.ComputeDriver):
             instance_dir = libvirt_utils.get_instance_path(instance)
             xml_path = os.path.join(instance_dir, 'libvirt.xml')
             libvirt_utils.write_to_file(xml_path, xml)
+            inst_type = flavors.extract_flavor(instance)
+            flavorid_path = os.path.join(instance_dir, 'flavorid.txt')
+            libvirt_utils.write_to_file(flavorid_path, inst_type['flavorid'])
 
         LOG.debug(_('End to_xml xml=%(xml)s'),
                   {'xml': xml}, instance=instance)
@@ -4206,7 +4301,8 @@ class LibvirtDriver(driver.ComputeDriver):
     def check_can_live_migrate_destination(self, context, instance,
                                            src_compute_info, dst_compute_info,
                                            block_migration=False,
-                                           disk_over_commit=False):
+                                           disk_over_commit=False,
+                                           pclm=None):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls
@@ -4238,7 +4334,8 @@ class LibvirtDriver(driver.ComputeDriver):
         return {"filename": filename,
                 "block_migration": block_migration,
                 "disk_over_commit": disk_over_commit,
-                "disk_available_mb": disk_available_mb}
+                "disk_available_mb": disk_available_mb,
+                "pclm": pclm}
 
     def check_can_live_migrate_destination_cleanup(self, context,
                                                    dest_check_data):
@@ -4444,7 +4541,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def live_migration(self, context, instance, dest,
                        post_method, recover_method, block_migration=False,
-                       migrate_data=None):
+                       migrate_data=None, pclm=None):
         """Spawning live_migration operation for distributing high-load.
 
         :param context: security context
@@ -4465,11 +4562,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
         greenthread.spawn(self._live_migration, context, instance, dest,
                           post_method, recover_method, block_migration,
-                          migrate_data)
+                          migrate_data, pclm)
 
     def _live_migration(self, context, instance, dest, post_method,
                         recover_method, block_migration=False,
-                        migrate_data=None):
+                        migrate_data=None, pclm=None):
         """Do live migration.
 
         :param context: security context
@@ -4496,12 +4593,28 @@ class LibvirtDriver(driver.ComputeDriver):
             flagvals = [getattr(libvirt, x.strip()) for x in flaglist]
             logical_sum = reduce(lambda x, y: x | y, flagvals)
 
-            dom = self._lookup_by_name(instance["name"])
-            dom.migrateToURI(CONF.libvirt.live_migration_uri % dest,
-                             logical_sum,
-                             None,
-                             CONF.libvirt.live_migration_bandwidth)
+            LOG.info(_('libvirt driver migrate to URI '
+                       '%(dest)s %(instance)s %(pclm)s.'),
+                     {'dest': dest, 'instance': instance["name"], 'pclm': pclm})
 
+            dom = self._lookup_by_name(instance["name"])
+            if not pclm:
+                LOG.info(_('libvirt driver migrate to migrateToURI %(uri)s.'),
+                         {'uri': CONF.libvirt.live_migration_uri % dest})
+                dom.migrateToURI(CONF.libvirt.live_migration_uri % dest,
+                                 logical_sum,
+                                 None,
+                                 CONF.libvirt.live_migration_bandwidth)
+            else:
+                LOG.info(_('libvirt driver migrate to migrateToURI2 %(uri)s %(miguri)s.'),
+                         {'uri': CONF.libvirt.live_migration_uri % dest,
+                          'miguri': CONF.libvirt.pclm_uri % (pclm, dest)} )
+                dom.migrateToURI2(CONF.libvirt.live_migration_uri % dest,
+                                  miguri = CONF.libvirt.pclm_uri % (pclm, dest),
+                                  dxml = None,
+                                  flags = logical_sum,
+                                  dname = None,
+                                  bandwidth = CONF.libvirt.live_migration_bandwidth)
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 LOG.error(_("Live Migration failure: %s"), e,

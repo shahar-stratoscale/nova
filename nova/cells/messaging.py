@@ -846,11 +846,12 @@ class _TargetedMessageMethods(_BaseMessageMethods):
         """Start an instance via compute_api.start()."""
         self._call_compute_api_with_obj(message.ctxt, instance, 'start')
 
-    def stop_instance(self, message, instance):
+    def stop_instance(self, message, instance, clean_shutdown=True):
         """Stop an instance via compute_api.stop()."""
         do_cast = not message.need_response
         return self._call_compute_api_with_obj(message.ctxt, instance,
-                                               'stop', do_cast=do_cast)
+                                               'stop', do_cast=do_cast,
+                                               clean_shutdown=clean_shutdown)
 
     def reboot_instance(self, message, instance, reboot_type):
         """Reboot an instance via compute_api.reboot()."""
@@ -890,11 +891,11 @@ class _TargetedMessageMethods(_BaseMessageMethods):
                                         **extra_instance_updates)
 
     def live_migrate_instance(self, message, instance, block_migration,
-                              disk_over_commit, host_name):
+                              disk_over_commit, host_name, pclm):
         """Live migrate an instance via compute_api.live_migrate()."""
         self._call_compute_api_with_obj(message.ctxt, instance,
                                         'live_migrate', block_migration,
-                                        disk_over_commit, host_name)
+                                        disk_over_commit, host_name, pclm)
 
     def revert_resize(self, message, instance):
         """Revert a resize for an instance in its cell."""
@@ -1713,12 +1714,15 @@ class MessageRunner(object):
         """Start an instance in its cell."""
         self._instance_action(ctxt, instance, 'start_instance')
 
-    def stop_instance(self, ctxt, instance, do_cast=True):
+    def stop_instance(self, ctxt, instance, do_cast=True, clean_shutdown=True):
         """Stop an instance in its cell."""
+        extra_kwargs = dict(clean_shutdown=clean_shutdown)
         if do_cast:
-            self._instance_action(ctxt, instance, 'stop_instance')
+            self._instance_action(ctxt, instance, 'stop_instance',
+                                  extra_kwargs=extra_kwargs)
         else:
             return self._instance_action(ctxt, instance, 'stop_instance',
+                                         extra_kwargs=extra_kwargs,
                                          need_response=True)
 
     def reboot_instance(self, ctxt, instance, reboot_type):
@@ -1758,11 +1762,12 @@ class MessageRunner(object):
                               extra_kwargs=extra_kwargs)
 
     def live_migrate_instance(self, ctxt, instance, block_migration,
-                              disk_over_commit, host_name):
+                              disk_over_commit, host_name, pclm):
         """Live migrate an instance in its cell."""
         extra_kwargs = dict(block_migration=block_migration,
                             disk_over_commit=disk_over_commit,
-                            host_name=host_name)
+                            host_name=host_name,
+                            pclm=pclm)
         self._instance_action(ctxt, instance, 'live_migrate_instance',
                               extra_kwargs=extra_kwargs)
 

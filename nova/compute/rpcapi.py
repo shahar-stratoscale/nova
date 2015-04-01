@@ -241,6 +241,9 @@ class ComputeAPI(object):
         3.21 - Made rebuild take new-world BDM objects
         3.22 - Made terminate_instance take new-world BDM objects
         3.23 - Added external_instance_event()
+        3.23.1 - Add clean_shutdown to stop, resize, rescue, shelve, and
+                 shelve_offload
+        3.23.2 - Add clean_shutdown to terminate_instance
     '''
 
     VERSION_ALIASES = {
@@ -350,14 +353,15 @@ class ComputeAPI(object):
                    instance=instance, diff=diff)
 
     def check_can_live_migrate_destination(self, ctxt, instance, destination,
-                                           block_migration, disk_over_commit):
+                                           block_migration, disk_over_commit, pclm):
         # NOTE(russellb) Havana compat
         version = self._get_compat_version('3.0', '2.38')
         cctxt = self.client.prepare(server=destination, version=version)
         return cctxt.call(ctxt, 'check_can_live_migrate_destination',
                           instance=instance,
                           block_migration=block_migration,
-                          disk_over_commit=disk_over_commit)
+                          disk_over_commit=disk_over_commit,
+                          pclm=pclm)
 
     def check_can_live_migrate_source(self, ctxt, instance, dest_check_data):
         # NOTE(russellb) Havana compat
@@ -533,14 +537,14 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'inject_network_info', instance=instance)
 
-    def live_migration(self, ctxt, instance, dest, block_migration, host,
+    def live_migration(self, ctxt, instance, dest, block_migration, host, pclm,
                        migrate_data=None):
         # NOTE(russellb) Havana compat
         version = self._get_compat_version('3.0', '2.0')
         instance_p = jsonutils.to_primitive(instance)
         cctxt = self.client.prepare(server=host, version=version)
         cctxt.cast(ctxt, 'live_migration', instance=instance_p,
-                   dest=dest, block_migration=block_migration,
+                   dest=dest, block_migration=block_migration, pclm=pclm,
                    migrate_data=migrate_data)
 
     def pause_instance(self, ctxt, instance):
@@ -686,8 +690,13 @@ class ComputeAPI(object):
         return cctxt.call(ctxt, 'remove_volume_connection',
                           instance=instance_p, volume_id=volume_id)
 
-    def rescue_instance(self, ctxt, instance, rescue_password):
-        if self.client.can_send_version('3.9'):
+    def rescue_instance(self, ctxt, instance, rescue_password,
+                        clean_shutdown=True):
+        msg_args = {'rescue_password': rescue_password}
+        if self.client.can_send_version('3.23.1'):
+            version = '3.23.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        elif self.client.can_send_version('3.9'):
             version = '3.9'
         else:
             # NOTE(russellb) Havana compat
@@ -696,7 +705,7 @@ class ComputeAPI(object):
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
         cctxt.cast(ctxt, 'rescue_instance', instance=instance,
-                   rescue_password=rescue_password)
+                   **msg_args)
 
     def reset_network(self, ctxt, instance):
         # NOTE(russellb) Havana compat
@@ -706,16 +715,20 @@ class ComputeAPI(object):
         cctxt.cast(ctxt, 'reset_network', instance=instance)
 
     def resize_instance(self, ctxt, instance, migration, image, instance_type,
-                        reservations=None):
-        # NOTE(russellb) Havana compat
-        version = self._get_compat_version('3.0', '2.45')
+                        reservations=None, clean_shutdown=True):
         instance_type_p = jsonutils.to_primitive(instance_type)
+        msg_args = {'instance': instance, 'migration': migration,
+                    'image': image, 'reservations': reservations,
+                    'instance_type': instance_type_p}
+        if self.client.can_send_version('3.23.1'):
+            version = '3.23.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        else:
+            # NOTE(russellb) Havana compat
+            version = self._get_compat_version('3.0', '2.45')
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
-        cctxt.cast(ctxt, 'resize_instance',
-                   instance=instance, migration=migration,
-                   image=image, reservations=reservations,
-                   instance_type=instance_type_p)
+        cctxt.cast(ctxt, 'resize_instance', **msg_args)
 
     def resume_instance(self, ctxt, instance):
         # NOTE(russellb) Havana compat
@@ -840,13 +853,18 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'start_instance', instance=instance)
 
-    def stop_instance(self, ctxt, instance, do_cast=True):
-        # NOTE(russellb) Havana compat
-        version = self._get_compat_version('3.0', '2.29')
+    def stop_instance(self, ctxt, instance, do_cast=True, clean_shutdown=True):
+        msg_args = {'instance': instance}
+        if self.client.can_send_version('3.23.1'):
+            version = '3.23.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        else:
+            # NOTE(russellb) Havana compat
+            version = self._get_compat_version('3.0', '2.29')
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
         rpc_method = cctxt.cast if do_cast else cctxt.call
-        return rpc_method(ctxt, 'stop_instance', instance=instance)
+        return rpc_method(ctxt, 'stop_instance', **msg_args)
 
     def suspend_instance(self, ctxt, instance):
         # NOTE(russellb) Havana compat
@@ -855,9 +873,13 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'suspend_instance', instance=instance)
 
-    def terminate_instance(self, ctxt, instance, bdms, reservations=None):
+    def terminate_instance(self, ctxt, instance, bdms, reservations=None, clean_shutdown=False):
         # NOTE(russellb) Havana compat
-        if self.client.can_send_version('3.22'):
+        msg_args = {}
+        if self.client.can_send_version('3.23.2'):
+            version = '3.23.2'
+            msg_args['clean_shutdown'] = clean_shutdown
+        elif self.client.can_send_version('3.22'):
             version = '3.22'
         else:
             version = self._get_compat_version('3.0', '2.35')
@@ -867,7 +889,7 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'terminate_instance',
                    instance=instance, bdms=bdms,
-                   reservations=reservations)
+                   reservations=reservations, **msg_args)
 
     def unpause_instance(self, ctxt, instance):
         # NOTE(russellb) Havana compat
@@ -906,20 +928,31 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'restore_instance', instance=instance)
 
-    def shelve_instance(self, ctxt, instance, image_id=None):
-        # NOTE(russellb) Havana compat
-        version = self._get_compat_version('3.0', '2.31')
+    def shelve_instance(self, ctxt, instance, image_id=None,
+                        clean_shutdown=True):
+        msg_args = {'instance': instance, 'image_id': image_id}
+        if self.client.can_send_version('3.23.1'):
+            version = '3.23.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        else:
+            # NOTE(russellb) Havana compat
+            version = self._get_compat_version('3.0', '2.31')
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
-        cctxt.cast(ctxt, 'shelve_instance',
-                   instance=instance, image_id=image_id)
+        cctxt.cast(ctxt, 'shelve_instance', **msg_args)
 
-    def shelve_offload_instance(self, ctxt, instance):
-        # NOTE(russellb) Havana compat
-        version = self._get_compat_version('3.0', '2.31')
+    def shelve_offload_instance(self, ctxt, instance,
+                                clean_shutdown=True):
+        msg_args = {'instance': instance}
+        if self.client.can_send_version('3.23.1'):
+            version = '3.23.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        else:
+            # NOTE(russellb) Havana compat
+            version = self._get_compat_version('3.0', '2.31')
         cctxt = self.client.prepare(server=_compute_host(None, instance),
                 version=version)
-        cctxt.cast(ctxt, 'shelve_offload_instance', instance=instance)
+        cctxt.cast(ctxt, 'shelve_offload_instance', **msg_args)
 
     def unshelve_instance(self, ctxt, instance, host, image=None,
                           filter_properties=None, node=None):

@@ -72,7 +72,7 @@ class CellsManager(manager.Manager):
     Scheduling requests get passed to the scheduler class.
     """
 
-    target = oslo_messaging.Target(version='1.27')
+    target = oslo_messaging.Target(version='1.27.1')
 
     def __init__(self, *args, **kwargs):
         LOG.warn(_('The cells feature of Nova is considered experimental '
@@ -462,10 +462,12 @@ class CellsManager(manager.Manager):
         """Start an instance in its cell."""
         self.msg_runner.start_instance(ctxt, instance)
 
-    def stop_instance(self, ctxt, instance, do_cast=True):
+    def stop_instance(self, ctxt, instance, do_cast=True,
+                      clean_shutdown=True):
         """Stop an instance in its cell."""
         response = self.msg_runner.stop_instance(ctxt, instance,
-                                                 do_cast=do_cast)
+                                                 do_cast=do_cast,
+                                                 clean_shutdown=clean_shutdown)
         if not do_cast:
             return response.value_or_raise()
 
@@ -516,12 +518,13 @@ class CellsManager(manager.Manager):
                                         flavor, extra_instance_updates)
 
     def live_migrate_instance(self, ctxt, instance, block_migration,
-                              disk_over_commit, host_name):
+                              disk_over_commit, host_name, pclm):
         """Live migrate an instance in its cell."""
         self.msg_runner.live_migrate_instance(ctxt, instance,
                                               block_migration,
                                               disk_over_commit,
-                                              host_name)
+                                              host_name,
+                                              pclm)
 
     def revert_resize(self, ctxt, instance):
         """Revert a resize for an instance in its cell."""

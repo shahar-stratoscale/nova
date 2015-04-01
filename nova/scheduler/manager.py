@@ -88,10 +88,10 @@ class SchedulerManager(manager.Manager):
                                    exception.InvalidSharedStorage,
                                    exception.MigrationPreCheckError)
     def live_migration(self, context, instance, dest,
-                       block_migration, disk_over_commit):
+                       block_migration, disk_over_commit, pclm):
         try:
             self._schedule_live_migration(context, instance, dest,
-                    block_migration, disk_over_commit)
+                    block_migration, disk_over_commit, pclm)
         except (exception.NoValidHost,
                 exception.ComputeServiceUnavailable,
                 exception.InvalidHypervisorType,
@@ -119,9 +119,9 @@ class SchedulerManager(manager.Manager):
                                              context, ex, request_spec)
 
     def _schedule_live_migration(self, context, instance, dest,
-            block_migration, disk_over_commit):
+            block_migration, disk_over_commit, pclm):
         task = live_migrate.LiveMigrationTask(context, instance,
-                    dest, block_migration, disk_over_commit)
+                    dest, block_migration, disk_over_commit, pclm)
         return task.execute()
 
     def run_instance(self, context, request_spec, admin_password,

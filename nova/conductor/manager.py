@@ -667,7 +667,7 @@ class ComputeTaskManager(base.Base):
                                    exception.InvalidSharedStorage,
                                    exception.MigrationPreCheckError)
     def migrate_server(self, context, instance, scheduler_hint, live, rebuild,
-            flavor, block_migration, disk_over_commit, reservations=None):
+            flavor, block_migration, disk_over_commit, pclm = None, reservations=None):
         if instance and not isinstance(instance, instance_obj.Instance):
             # NOTE(danms): Until v2 of the RPC API, we need to tolerate
             # old-world instance objects here
@@ -678,7 +678,7 @@ class ComputeTaskManager(base.Base):
                 expected_attrs=attrs)
         if live and not rebuild and not flavor:
             self._live_migrate(context, instance, scheduler_hint,
-                               block_migration, disk_over_commit)
+                               block_migration, disk_over_commit, pclm)
         elif not live and not rebuild and flavor:
             instance_uuid = instance['uuid']
             with compute_utils.EventReporter(context, self.db,
@@ -750,11 +750,11 @@ class ComputeTaskManager(base.Base):
                 ex, request_spec, self.db)
 
     def _live_migrate(self, context, instance, scheduler_hint,
-                      block_migration, disk_over_commit):
+                      block_migration, disk_over_commit, pclm):
         destination = scheduler_hint.get("host")
         try:
             live_migrate.execute(context, instance, destination,
-                             block_migration, disk_over_commit)
+                             block_migration, disk_over_commit, pclm)
         except (exception.NoValidHost,
                 exception.ComputeServiceUnavailable,
                 exception.InvalidHypervisorType,

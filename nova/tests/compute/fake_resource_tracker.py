@@ -19,6 +19,10 @@ from nova.compute import resource_tracker
 class FakeResourceTracker(resource_tracker.ResourceTracker):
     """Version without a DB requirement."""
 
+    def __init__(self, *args, **kawrgs):
+        super(FakeResourceTracker, self).__init__(*args, **kawrgs)
+        self.arieMode = False
+
     def _create(self, context, values):
         self.compute_node = values
         self.compute_node['id'] = 1

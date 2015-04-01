@@ -42,8 +42,9 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
                                'migrate_live': 'live_migrate'}
         body_map = {'migrate_live': {'host': 'hostname',
                                      'block_migration': False,
-                                     'disk_over_commit': False}}
-        args_map = {'migrate_live': ((False, False, 'hostname'), {})}
+                                     'disk_over_commit': False,
+                                     'pclm': "pclm"}}
+        args_map = {'migrate_live': ((False, False, 'hostname', "pclm"), {})}
         self._test_actions(['migrate', 'migrate_live'], body_map=body_map,
                            method_translations=method_translations,
                            args_map=args_map)
@@ -51,7 +52,8 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
     def test_migrate_with_non_existed_instance(self):
         body_map = {'migrate_live': {'host': 'hostname',
                                      'block_migration': False,
-                                     'disk_over_commit': False}}
+                                     'disk_over_commit': False,
+                                     'pclm': "pclm"}}
         self._test_actions_with_non_existed_instance(
             ['migrate', 'migrate_live'], body_map=body_map)
 
@@ -60,8 +62,9 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
                                'migrate_live': 'live_migrate'}
         body_map = {'migrate_live': {'host': 'hostname',
                                      'block_migration': False,
-                                     'disk_over_commit': False}}
-        args_map = {'migrate_live': ((False, False, 'hostname'), {})}
+                                     'disk_over_commit': False,
+                                     'pclm': "pclm"}}
+        args_map = {'migrate_live': ((False, False, 'hostname', "pclm"), {})}
         self._test_actions_raise_conflict_on_invalid_state(
             ['migrate', 'migrate_live'], body_map=body_map, args_map=args_map,
             method_translations=method_translations)
@@ -91,7 +94,7 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
         self.mox.StubOutWithMock(self.compute_api, 'live_migrate')
         instance = self._stub_instance_get()
         self.compute_api.live_migrate(self.context, instance, False,
-                                      False, 'hostname')
+                                      False, 'hostname', "pclm")
 
         self.mox.ReplayAll()
 
@@ -102,34 +105,39 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
     def test_migrate_live_enabled(self):
         param = {'host': 'hostname',
                  'block_migration': False,
-                 'disk_over_commit': False}
+                 'disk_over_commit': False,
+                 'pclm': "pclm"}
         self._test_migrate_live_succeeded(param)
 
     def test_migrate_live_enabled_with_string_param(self):
         param = {'host': 'hostname',
                  'block_migration': "False",
-                 'disk_over_commit': "False"}
+                 'disk_over_commit': "False",
+                 'pclm': "pclm"}
         self._test_migrate_live_succeeded(param)
 
     def test_migrate_live_missing_dict_param(self):
         res = self._make_request('/servers/FAKE/action',
                                  {'migrate_live': {'dummy': 'hostname',
                                                    'block_migration': False,
-                                                   'disk_over_commit': False}})
+                                                   'disk_over_commit': False,
+                                                   'pclm': "pclm"}})
         self.assertEqual(400, res.status_int)
 
     def test_migrate_live_with_invalid_block_migration(self):
         res = self._make_request('/servers/FAKE/action',
                                  {'migrate_live': {'host': 'hostname',
                                                    'block_migration': "foo",
-                                                   'disk_over_commit': False}})
+                                                   'disk_over_commit': False,
+                                                   'pclm': "pclm"}})
         self.assertEqual(400, res.status_int)
 
     def test_migrate_live_with_invalid_disk_over_commit(self):
         res = self._make_request('/servers/FAKE/action',
                                  {'migrate_live': {'host': 'hostname',
                                                    'block_migration': False,
-                                                   'disk_over_commit': "foo"}})
+                                                   'disk_over_commit': "foo",
+                                                   'pclm': "pclm"}})
         self.assertEqual(400, res.status_int)
 
     def _test_migrate_live_failed_with_exception(self, fake_exc,
@@ -138,7 +146,7 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
 
         instance = self._stub_instance_get(uuid=uuid)
         self.compute_api.live_migrate(self.context, instance, False,
-                                      False, 'hostname').AndRaise(fake_exc)
+                                      False, 'hostname', "pclm").AndRaise(fake_exc)
 
         self.mox.ReplayAll()
 
@@ -146,7 +154,8 @@ class MigrateServerTests(admin_only_action_common.CommonTests):
                                  {'migrate_live':
                                   {'host': 'hostname',
                                    'block_migration': False,
-                                   'disk_over_commit': False}})
+                                   'disk_over_commit': False,
+                                   'pclm': "pclm"}})
         self.assertEqual(400, res.status_int)
         self.assertIn(unicode(fake_exc), res.body)
 

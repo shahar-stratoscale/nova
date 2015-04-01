@@ -314,22 +314,22 @@ class IntegerRangeTestCase(APIValidationTestCase):
 
     def test_validate_integer_range_fails(self):
         detail = ("Invalid input for field/attribute foo. Value: 0."
-                  " 0.0 is less than the minimum of 1")
+                  " 0 is less than the minimum of 1")
         self.check_validation_error(self.post, body={'foo': 0},
                                     expected_detail=detail)
 
         detail = ("Invalid input for field/attribute foo. Value: 11."
-                  " 11.0 is greater than the maximum of 10")
+                  " 11 is greater than the maximum of 10")
         self.check_validation_error(self.post, body={'foo': 11},
                                     expected_detail=detail)
 
         detail = ("Invalid input for field/attribute foo. Value: 0."
-                  " 0.0 is less than the minimum of 1")
+                  " 0 is less than the minimum of 1")
         self.check_validation_error(self.post, body={'foo': '0'},
                                     expected_detail=detail)
 
         detail = ("Invalid input for field/attribute foo. Value: 11."
-                  " 11.0 is greater than the maximum of 10")
+                  " 11 is greater than the maximum of 10")
         self.check_validation_error(self.post, body={'foo': '11'},
                                     expected_detail=detail)
 
@@ -555,7 +555,7 @@ class TcpUdpPortTestCase(APIValidationTestCase):
                                     expected_detail=detail)
 
         detail = ("Invalid input for field/attribute foo. Value: 65536."
-                  " 65536.0 is greater than the maximum of 65535")
+                  " 65536 is greater than the maximum of 65535")
         self.check_validation_error(self.post, body={'foo': 65536},
                                     expected_detail=detail)
 

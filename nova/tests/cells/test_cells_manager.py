@@ -756,12 +756,13 @@ class CellsManagerClassTestCase(test.NoDBTestCase):
         self.mox.StubOutWithMock(self.msg_runner, 'live_migrate_instance')
         self.msg_runner.live_migrate_instance(self.ctxt, 'fake-instance',
                                               'fake-block', 'fake-commit',
-                                              'fake-host')
+                                              'fake-host',
+                                              'fake-pclm')
         self.mox.ReplayAll()
         self.cells_manager.live_migrate_instance(
                 self.ctxt, instance='fake-instance',
                 block_migration='fake-block', disk_over_commit='fake-commit',
-                host_name='fake-host')
+                host_name='fake-host', pclm='fake-pclm')
 
     def test_revert_resize(self):
         self.mox.StubOutWithMock(self.msg_runner, 'revert_resize')

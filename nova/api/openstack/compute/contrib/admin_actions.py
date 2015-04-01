@@ -319,8 +319,9 @@ class AdminActionsController(wsgi.Controller):
             block_migration = body["os-migrateLive"]["block_migration"]
             disk_over_commit = body["os-migrateLive"]["disk_over_commit"]
             host = body["os-migrateLive"]["host"]
+            pclm = body["os-migrateLive"]["pclm"]
         except (TypeError, KeyError):
-            msg = _("host, block_migration and disk_over_commit must "
+            msg = _("host, block_migration, disk_over_commit and pclm must "
                     "be specified for live migration.")
             raise exc.HTTPBadRequest(explanation=msg)
 
@@ -335,7 +336,7 @@ class AdminActionsController(wsgi.Controller):
         try:
             instance = self.compute_api.get(context, id, want_objects=True)
             self.compute_api.live_migrate(context, instance, block_migration,
-                                          disk_over_commit, host)
+                                          disk_over_commit, host, pclm)
         except (exception.ComputeServiceUnavailable,
                 exception.InvalidHypervisorType,
                 exception.UnableToMigrateToSelf,

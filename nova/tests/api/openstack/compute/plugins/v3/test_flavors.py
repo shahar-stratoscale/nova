@@ -136,6 +136,7 @@ class FlavorsTest(test.TestCase):
                 "vcpus": 0,
                 "swap": 0,
                 "ephemeral": 0,
+                "extra_specs": {},
                 "disabled": False,
                 "links": [
                     {
@@ -165,6 +166,7 @@ class FlavorsTest(test.TestCase):
                 "vcpus": 0,
                 "swap": 0,
                 "ephemeral": 0,
+                "extra_specs": {},
                 "disabled": False,
                 "links": [
                     {
@@ -339,6 +341,7 @@ class FlavorsTest(test.TestCase):
                     "vcpus": 0,
                     "swap": 0,
                     "ephemeral": 0,
+                    "extra_specs": {},
                     "disabled": False,
                     "links": [
                         {
@@ -359,6 +362,7 @@ class FlavorsTest(test.TestCase):
                     "vcpus": 0,
                     "swap": 1024,
                     "ephemeral": 10,
+                    "extra_specs": {},
                     "disabled": True,
                     "links": [
                         {
@@ -461,6 +465,7 @@ class FlavorsTest(test.TestCase):
                     "vcpus": 0,
                     "swap": 1024,
                     "ephemeral": 10,
+                    "extra_specs": {},
                     "disabled": True,
                     "links": [
                         {

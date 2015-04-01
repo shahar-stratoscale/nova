@@ -14,6 +14,7 @@
         ],
         "name": "%(flavor_name)s",
         "ram": 1024,
+        "extra_specs": {},
         "swap": 5,
         "vcpus": 2
     }

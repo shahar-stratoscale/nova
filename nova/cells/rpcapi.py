@@ -90,6 +90,7 @@ class CellsAPI(object):
         1.25 - Adds rebuild_instance()
         1.26 - Adds service_delete()
         1.27 - Updates instance_delete_everywhere() for instance objects
+        1.27.1 - Add clean_shutdown to stop, resize, rescue, and shelve
     '''
 
     VERSION_ALIASES = {
@@ -415,17 +416,23 @@ class CellsAPI(object):
         cctxt = self.client.prepare(version='1.12')
         cctxt.cast(ctxt, 'start_instance', instance=instance)
 
-    def stop_instance(self, ctxt, instance, do_cast=True):
+    def stop_instance(self, ctxt, instance, do_cast=True, clean_shutdown=True):
         """Stop an instance in its cell.
 
         This method takes a new-world instance object.
         """
         if not CONF.cells.enable:
             return
-        cctxt = self.client.prepare(version='1.12')
+        msg_args = {'instance': instance,
+                    'do_cast': do_cast}
+        if self.client.can_send_version('1.27.1'):
+            version = '1.27.1'
+            msg_args['clean_shutdown'] = clean_shutdown
+        else:
+            version = '1.12'
+        cctxt = self.client.prepare(version=version)
         method = do_cast and cctxt.cast or cctxt.call
-        return method(ctxt, 'stop_instance',
-                      instance=instance, do_cast=do_cast)
+        return method(ctxt, 'stop_instance', **msg_args)
 
     def cell_create(self, ctxt, values):
         cctxt = self.client.prepare(version='1.13')
@@ -527,7 +534,7 @@ class CellsAPI(object):
                    extra_instance_updates=extra_instance_updates)
 
     def live_migrate_instance(self, ctxt, instance, host_name,
-                              block_migration, disk_over_commit):
+                              block_migration, disk_over_commit, pclm):
         if not CONF.cells.enable:
             return
         cctxt = self.client.prepare(version='1.20')
@@ -535,7 +542,8 @@ class CellsAPI(object):
                    instance=instance,
                    block_migration=block_migration,
                    disk_over_commit=disk_over_commit,
-                   host_name=host_name)
+                   host_name=host_name,
+                   pclm=pclm)
 
     def revert_resize(self, ctxt, instance, migration, host,
                       reservations):

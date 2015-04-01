@@ -38,7 +38,7 @@ CONF.register_opt(migrate_opt)
 
 class LiveMigrationTask(object):
     def __init__(self, context, instance, destination,
-                 block_migration, disk_over_commit):
+                 block_migration, disk_over_commit, pclm):
         self.context = context
         self.instance = instance
         self.destination = destination
@@ -50,6 +50,7 @@ class LiveMigrationTask(object):
         self.servicegroup_api = servicegroup.API()
         self.scheduler_rpcapi = scheduler_rpcapi.SchedulerAPI()
         self.image_service = glance.get_default_image_service()
+        self.pclm = pclm
 
     def execute(self):
         self._check_instance_is_running()
@@ -66,6 +67,7 @@ class LiveMigrationTask(object):
                 instance=self.instance,
                 dest=self.destination,
                 block_migration=self.block_migration,
+                pclm=self.pclm,
                 migrate_data=self.migrate_data)
                 #TODO(johngarbutt) disk_over_commit?
 
@@ -138,7 +140,7 @@ class LiveMigrationTask(object):
     def _call_livem_checks_on_host(self, destination):
         self.migrate_data = self.compute_rpcapi.\
             check_can_live_migrate_destination(self.context, self.instance,
-                destination, self.block_migration, self.disk_over_commit)
+                destination, self.block_migration, self.disk_over_commit, self.pclm)
 
     def _find_destination(self):
         #TODO(johngarbutt) this retry loop should be shared
@@ -182,10 +184,11 @@ class LiveMigrationTask(object):
 
 
 def execute(context, instance, destination,
-            block_migration, disk_over_commit):
+            block_migration, disk_over_commit, pclm):
     task = LiveMigrationTask(context, instance,
                              destination,
                              block_migration,
-                             disk_over_commit)
+                             disk_over_commit,
+                             pclm)
     #TODO(johngarbutt) create a superclass that contains a safe_execute call
     return task.execute()

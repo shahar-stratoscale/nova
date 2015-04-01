@@ -17,6 +17,7 @@
         "name": "m1.tiny",
         "os-flavor-access:is_public": true,
         "ram": 512,
+        "extra_specs": {},
         "rxtx_factor": 1.0,
         "swap": "",
         "vcpus": 1

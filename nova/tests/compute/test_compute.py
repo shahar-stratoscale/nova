@@ -2013,7 +2013,8 @@ class ComputeTestCase(BaseTestCase):
 
         called = {'power_off': False}
 
-        def fake_driver_power_off(self, instance):
+        def fake_driver_power_off(self, instance,
+                                  shutdown_timeout, shutdown_attempts):
             called['power_off'] = True
 
         self.stubs.Set(nova.virt.fake.FakeDriver, 'power_off',
@@ -5072,7 +5073,7 @@ class ComputeTestCase(BaseTestCase):
         self.assertRaises(test.TestingException,
                           self.compute.live_migration,
                           c, dest=dest_host, block_migration=True,
-                          instance=instance, migrate_data={})
+                          instance=instance, migrate_data={}, pclm="pclm")
 
     def test_live_migration_works_correctly(self):
         # Confirm live_migration() works as expected correctly.
@@ -5115,6 +5116,7 @@ class ComputeTestCase(BaseTestCase):
         ret = self.compute.live_migration(c, dest=dest,
                                           instance=instance,
                                           block_migration=False,
+                                          pclm="pclm",
                                           migrate_data=migrate_data)
         self.assertIsNone(ret)
 
@@ -8531,6 +8533,7 @@ class ComputeAPITestCase(BaseTestCase):
         sys_meta = flavors.save_flavor_info({}, new_type)
 
         instance = instance_obj.Instance(image_ref='foo',
+                                         uuid='uuid666',
                                          system_metadata=sys_meta)
         self.mox.StubOutWithMock(self.compute.network_api,
                                  'allocate_port_for_instance')
@@ -8557,7 +8560,7 @@ class ComputeAPITestCase(BaseTestCase):
         self.stubs.Set(self.compute.network_api,
                        'deallocate_port_for_instance',
                        lambda a, b, c: [])
-        instance = instance_obj.Instance()
+        instance = instance_obj.Instance(uuid='uuid666')
         self.compute.detach_interface(self.context, instance, port_id)
         self.assertEqual(self.compute.driver._interfaces, {})
 
@@ -9028,14 +9031,16 @@ class ComputeAPITestCase(BaseTestCase):
         self.mox.StubOutWithMock(rpcapi, 'live_migrate_instance')
         rpcapi.live_migrate_instance(self.context, instance, 'fake_dest_host',
                                      block_migration=True,
-                                     disk_over_commit=True)
+                                     disk_over_commit=True,
+                                     pclm="pclm")
 
         self.mox.ReplayAll()
 
         self.compute_api.live_migrate(self.context, instance,
                                       block_migration=True,
                                       disk_over_commit=True,
-                                      host_name='fake_dest_host')
+                                      host_name='fake_dest_host',
+                                      pclm="pclm")
 
         instance.refresh()
         self.assertEqual(instance['task_state'], task_states.MIGRATING)

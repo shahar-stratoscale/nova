@@ -175,6 +175,10 @@ timeout_opts = [
                default=0,
                help="Automatically confirm resizes after N seconds. "
                     "Set to 0 to disable."),
+    cfg.IntOpt("shutdown_timeout",
+               default=60,
+               help="Total amount of time to wait in seconds for an instance "
+                    "to perform a clean shutdown."),
 ]
 
 running_deleted_opts = [
@@ -565,7 +569,12 @@ class ComputeVirtAPI(virtapi.VirtAPI):
 class ComputeManager(manager.Manager):
     """Manages the running instances from creation to destruction."""
 
-    target = messaging.Target(version='3.23')
+    target = messaging.Target(version='3.23.2')
+
+    # How long to wait in seconds before re-issuing a shutdown
+    # signal to a instance during power off.  The overall
+    # time to wait is set by CONF.shutdown_timeout.
+    SHUTDOWN_RETRY_INTERVAL = 10
 
     def __init__(self, compute_driver=None, *args, **kwargs):
         """Load configuration options and connect to the hypervisor."""
@@ -2112,13 +2121,34 @@ class ComputeManager(manager.Manager):
                           instance=instance)
                 self._set_instance_error_state(context, instance['uuid'])
 
+    def _get_power_off_values(self, context, instance, clean_shutdown):
+        """Get the timing configuration for powering down this instance."""
+        if clean_shutdown:
+            timeout = compute_utils.get_value_from_system_metadata(instance,
+                          key='image_os_shutdown_timeout', type=int,
+                          default=CONF.shutdown_timeout)
+            retry_interval = self.SHUTDOWN_RETRY_INTERVAL
+        else:
+            timeout = 0
+            retry_interval = 0
+
+        return timeout, retry_interval
+
+    def _power_off_instance(self, context, instance, clean_shutdown=True):
+        """Power off an instance on this host."""
+        timeout, retry_interval = self._get_power_off_values(context,
+                                        instance, clean_shutdown)
+        self.driver.power_off(instance, timeout, retry_interval)
+
     def _shutdown_instance(self, context, instance,
-                           bdms, requested_networks=None, notify=True):
+                           bdms, requested_networks=None, notify=True, clean_shutdown=False):
         """Shutdown an instance on this host."""
         context = context.elevated()
         LOG.audit(_('%(action_str)s instance') % {'action_str': 'Terminating'},
                   context=context, instance=instance)
 
+        timeout, retry_interval = self._get_power_off_values(context,
+                                        instance, clean_shutdown)
         if notify:
             self._notify_about_instance_usage(context, instance,
                                               "shutdown.start")
@@ -2134,7 +2164,7 @@ class ComputeManager(manager.Manager):
         #                want to keep ip allocated for certain failures
         try:
             self.driver.destroy(context, instance, network_info,
-                    block_device_info)
+                    block_device_info, timeout=timeout, retry_interval=retry_interval)
         except exception.InstancePowerOffFailure:
             # if the instance can't power off, don't release the ip
             with excutils.save_and_reraise_exception():
@@ -2177,7 +2207,7 @@ class ComputeManager(manager.Manager):
             # NOTE(vish): bdms will be deleted on instance destroy
 
     @hooks.add_hook("delete_instance")
-    def _delete_instance(self, context, instance, bdms, quotas):
+    def _delete_instance(self, context, instance, bdms, quotas, clean_shutdown=False):
         """Delete an instance on this host.  Commit or rollback quotas
         as necessary.
         """
@@ -2202,7 +2232,7 @@ class ComputeManager(manager.Manager):
             instance.info_cache.delete()
             self._notify_about_instance_usage(context, instance,
                                               "delete.start")
-            self._shutdown_instance(context, db_inst, bdms)
+            self._shutdown_instance(context, db_inst, bdms, clean_shutdown=clean_shutdown)
             # NOTE(vish): We have already deleted the instance, so we have
             #             to ignore problems cleaning up the volumes. It
             #             would be nice to let the user know somehow that
@@ -2242,7 +2272,7 @@ class ComputeManager(manager.Manager):
     @reverts_task_state
     @wrap_instance_event
     @wrap_instance_fault
-    def terminate_instance(self, context, instance, bdms, reservations):
+    def terminate_instance(self, context, instance, bdms, reservations, clean_shutdown=False):
         """Terminate an instance on this host."""
         # NOTE (ndipanov): If we get non-object BDMs, just get them from the
         # db again, as this means they are sent in the old format and we want
@@ -2261,7 +2291,7 @@ class ComputeManager(manager.Manager):
         @utils.synchronized(instance['uuid'])
         def do_terminate_instance(instance, bdms):
             try:
-                self._delete_instance(context, instance, bdms, quotas)
+                self._delete_instance(context, instance, bdms, quotas, clean_shutdown=clean_shutdown)
             except exception.InstanceNotFound:
                 LOG.info(_("Instance disappeared during terminate"),
                          instance=instance)
@@ -2282,10 +2312,10 @@ class ComputeManager(manager.Manager):
     @reverts_task_state
     @wrap_instance_event
     @wrap_instance_fault
-    def stop_instance(self, context, instance):
+    def stop_instance(self, context, instance, clean_shutdown=True):
         """Stopping an instance on this host."""
         self._notify_about_instance_usage(context, instance, "power_off.start")
-        self.driver.power_off(instance)
+        self._power_off_instance(context, instance, clean_shutdown)
         current_power_state = self._get_power_state(context, instance)
         instance.power_state = current_power_state
         instance.vm_state = vm_states.STOPPED
@@ -4304,10 +4334,15 @@ class ComputeManager(manager.Manager):
                                                       new_volume_id,
                                                       error=failed)
 
+        mode = 'rw'
+        if 'data' in new_cinfo:
+            mode = new_cinfo['data'].get('access_mode', 'rw')
+
         self.volume_api.attach(context,
                                new_volume_id,
                                instance['uuid'],
-                               mountpoint)
+                               mountpoint,
+                               mode=mode)
         # Remove old connection
         self.volume_api.detach(context.elevated(), old_volume_id)
 
@@ -4363,39 +4398,45 @@ class ComputeManager(manager.Manager):
     def attach_interface(self, context, instance, network_id, port_id,
                          requested_ip):
         """Use hotplug to add an network adapter to an instance."""
-        network_info = self.network_api.allocate_port_for_instance(
-            context, instance, port_id, network_id, requested_ip)
-        if len(network_info) != 1:
-            LOG.error(_('allocate_port_for_instance returned %(ports)s ports')
-                      % dict(ports=len(network_info)))
-            raise exception.InterfaceAttachFailed(instance=instance)
-        image_ref = instance.get('image_ref')
-        image_service, image_id = glance.get_remote_image_service(
-            context, image_ref)
-        image_meta = compute_utils.get_image_metadata(
-            context, image_service, image_ref, instance)
+        @utils.synchronized(instance['uuid'])
+        def _sync_attach_interface():
+            network_info = self.network_api.allocate_port_for_instance(
+                context, instance, port_id, network_id, requested_ip)
+            if len(network_info) != 1:
+                LOG.error(_('allocate_port_for_instance returned %(ports)s ports')
+                          % dict(ports=len(network_info)))
+                raise exception.InterfaceAttachFailed(instance=instance)
+            image_ref = instance.get('image_ref')
+            image_service, image_id = glance.get_remote_image_service(
+                context, image_ref)
+            image_meta = compute_utils.get_image_metadata(
+                context, image_service, image_ref, instance)
 
-        self.driver.attach_interface(instance, image_meta, network_info[0])
-        return network_info[0]
+            self.driver.attach_interface(instance, image_meta, network_info[0])
+            return network_info[0]
+        return _sync_attach_interface()
 
     @object_compat
     def detach_interface(self, context, instance, port_id):
         """Detach an network adapter from an instance."""
-        # FIXME(comstud): Why does this need elevated context?
-        network_info = self._get_instance_nw_info(context.elevated(),
-                                                  instance)
-        condemned = None
-        for vif in network_info:
-            if vif['id'] == port_id:
-                condemned = vif
-                break
-        if condemned is None:
-            raise exception.PortNotFound(_("Port %s is not "
-                                           "attached") % port_id)
+        @utils.synchronized(instance['uuid'])
+        def _sync_dettach_interface():
+            # FIXME(comstud): Why does this need elevated context?
+            network_info = self._get_instance_nw_info(context.elevated(),
+                                                      instance)
+            condemned = None
+            for vif in network_info:
+                if vif['id'] == port_id:
+                    condemned = vif
+                    break
+            if condemned is None:
+                raise exception.PortNotFound(_("Port %s is not "
+                                               "attached") % port_id)
 
-        self.network_api.deallocate_port_for_instance(context, instance,
-                                                      port_id)
-        self.driver.detach_interface(instance, condemned)
+            self.network_api.deallocate_port_for_instance(context, instance,
+                                                          port_id)
+            self.driver.detach_interface(instance, condemned)
+        return _sync_dettach_interface()
 
     def _get_compute_info(self, context, host):
         compute_node_ref = self.conductor_api.service_get_by_compute_host(
@@ -4421,7 +4462,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def check_can_live_migrate_destination(self, ctxt, instance,
-                                           block_migration, disk_over_commit):
+                                           block_migration, disk_over_commit, pclm):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls
@@ -4437,7 +4478,7 @@ class ComputeManager(manager.Manager):
         dst_compute_info = self._get_compute_info(ctxt, CONF.host)
         dest_check_data = self.driver.check_can_live_migrate_destination(ctxt,
             instance, src_compute_info, dst_compute_info,
-            block_migration, disk_over_commit)
+            block_migration, disk_over_commit, pclm)
         migrate_data = {}
         try:
             migrate_data = self.compute_rpcapi.\
@@ -4520,7 +4561,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def live_migration(self, context, dest, instance, block_migration,
-                       migrate_data):
+                       migrate_data, pclm):
         """Executing live migration.
 
         :param context: security context
@@ -4556,12 +4597,12 @@ class ComputeManager(manager.Manager):
         self.driver.live_migration(context, instance, dest,
                                    self._post_live_migration,
                                    self._rollback_live_migration,
-                                   block_migration, migrate_data)
+                                   block_migration, migrate_data, pclm)
 
     @wrap_exception()
     @wrap_instance_fault
     def _post_live_migration(self, ctxt, instance,
-                            dest, block_migration=False, migrate_data=None):
+                            dest, block_migration=False, migrate_data=None, pclm=None):
         """Post operations for live migration.
 
         This method is called from live_migration
@@ -4875,16 +4916,19 @@ class ComputeManager(manager.Manager):
                     break
 
         if instance:
-            # We have an instance now to refresh
-            try:
-                # Call to network API to get instance info.. this will
-                # force an update to the instance's info_cache
-                self._get_instance_nw_info(context, instance, use_slave=True)
-                LOG.debug(_('Updated the network info_cache for instance'),
-                          instance=instance)
-            except Exception:
-                LOG.error(_('An error occurred while refreshing the network '
-                            'cache.'), instance=instance, exc_info=True)
+            @utils.synchronized(instance['uuid'])
+            def _heal_instance_info_cache():
+                # We have an instance now to refresh
+                try:
+                    # Call to network API to get instance info.. this will
+                    # force an update to the instance's info_cache
+                    self._get_instance_nw_info(context, instance, use_slave=True)
+                    LOG.debug(_('Updated the network info_cache for instance'),
+                              instance=instance)
+                except Exception:
+                    LOG.error(_('An error occurred while refreshing the network '
+                                'cache.'), instance=instance, exc_info=True)
+            _heal_instance_info_cache()
         else:
             LOG.debug(_("Didn't find any instances for network info cache "
                         "update."))

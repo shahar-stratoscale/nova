@@ -113,6 +113,33 @@ class ViewBuilder(common.ViewBuilder):
 
         return server
 
+    def strato_show(self, request, instance):
+        """Detailed view of a single instance."""
+        server = {
+            "server": {
+                "id": instance["uuid"],
+                "name": instance["display_name"],
+                "status": self._get_vm_status(instance),
+                "tenant_id": instance.get("project_id") or "",
+                "user_id": instance.get("user_id") or "",
+                "image": self._get_image(request, instance),
+                "flavor": self._strato_get_flavor(request, instance),
+                "created": timeutils.isotime(instance["created_at"]),
+                "updated": timeutils.isotime(instance["updated_at"]),
+                "OS-EXT-SRV-ATTR:host": instance["host"],
+                "OS-EXT-SRV-ATTR:instance_name": instance["name"],
+                "OS-EXT-SRV-ATTR:hypervisor_hostname": instance["node"],
+                "links": self._get_links(request,
+                                         instance["uuid"],
+                                         self._collection_name),
+            },
+        }
+        if server["server"]["status"] in self._progress_statuses:
+            server["server"]["progress"] = instance.get("progress", 0)
+
+        return server
+
+
     def index(self, request, instances):
         """Show a list of servers without many details."""
         return self._list_view(self.basic, request, instances)
@@ -120,6 +147,10 @@ class ViewBuilder(common.ViewBuilder):
     def detail(self, request, instances):
         """Detailed view of a list of instance."""
         return self._list_view(self.show, request, instances)
+
+    def strato(self, request, instances):
+        """Detailed view of a list of instance."""
+        return self._list_view(self.strato_show, request, instances)
 
     def _list_view(self, func, request, servers):
         """Provide a view for a list of servers."""
@@ -180,6 +211,19 @@ class ViewBuilder(common.ViewBuilder):
             }
         else:
             return ""
+
+    def _strato_get_flavor(self, request, instance):
+        flavor_id = instance["instance_type"]["flavorid"]
+        flavor_bookmark = self._flavor_builder._get_bookmark_link(request,
+                                                                  flavor_id,
+                                                                  "flavors")
+        return {
+            "id": str(flavor_id),
+            "links": [{
+                "rel": "bookmark",
+                "href": flavor_bookmark,
+            }],
+        }
 
     def _get_flavor(self, request, instance):
         instance_type = flavors.extract_flavor(instance)
