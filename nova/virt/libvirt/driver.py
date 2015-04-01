@@ -165,6 +165,11 @@ libvirt_opts = [
                     '(any included "%s" is replaced with '
                     'the migration target hostname)',
                deprecated_group='DEFAULT'),
+    cfg.StrOpt('pclm_uri',
+               default="pclm:%s:%s",
+               help='PCLM URI '
+                    '1st "%s" is replaced with migration source NodeId'
+                    '2nd "%s" is replaced with target hostname)'),
     cfg.StrOpt('live_migration_flag',
                default='VIR_MIGRATE_UNDEFINE_SOURCE, VIR_MIGRATE_PEER2PEER',
                help='Migration flags to be set for live migration',
@@ -206,6 +211,8 @@ libvirt_opts = [
                       'LibvirtFibreChannelVolumeDriver',
                   'scality='
                       'nova.virt.libvirt.volume.LibvirtScalityVolumeDriver',
+                  'mancala='
+                      'nova.virt.libvirt.volume.LibvirtMancalaVolumeDriver',
                   ],
                 help='Libvirt handlers for remote volumes.',
                 deprecated_name='libvirt_volume_drivers',
@@ -3259,8 +3266,13 @@ class LibvirtDriver(driver.ComputeDriver):
             tmrtc.name = "rtc"
             tmrtc.tickpolicy = "catchup"
 
+            tmkvmclock = vconfig.LibvirtConfigGuestTimer()
+            tmkvmclock.name = "kvmclock"
+            tmkvmclock.present = False
+
             clk.add_timer(tmpit)
             clk.add_timer(tmrtc)
+            clk.add_timer(tmkvmclock)
 
             arch = libvirt_utils.get_arch(image_meta)
             if arch in ("i686", "x86_64"):
@@ -4206,7 +4218,8 @@ class LibvirtDriver(driver.ComputeDriver):
     def check_can_live_migrate_destination(self, context, instance,
                                            src_compute_info, dst_compute_info,
                                            block_migration=False,
-                                           disk_over_commit=False):
+                                           disk_over_commit=False,
+                                           pclm=None):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls
@@ -4238,7 +4251,8 @@ class LibvirtDriver(driver.ComputeDriver):
         return {"filename": filename,
                 "block_migration": block_migration,
                 "disk_over_commit": disk_over_commit,
-                "disk_available_mb": disk_available_mb}
+                "disk_available_mb": disk_available_mb,
+                "pclm": pclm}
 
     def check_can_live_migrate_destination_cleanup(self, context,
                                                    dest_check_data):
@@ -4444,7 +4458,7 @@ class LibvirtDriver(driver.ComputeDriver):
 
     def live_migration(self, context, instance, dest,
                        post_method, recover_method, block_migration=False,
-                       migrate_data=None):
+                       migrate_data=None, pclm=None):
         """Spawning live_migration operation for distributing high-load.
 
         :param context: security context
@@ -4465,11 +4479,11 @@ class LibvirtDriver(driver.ComputeDriver):
 
         greenthread.spawn(self._live_migration, context, instance, dest,
                           post_method, recover_method, block_migration,
-                          migrate_data)
+                          migrate_data, pclm)
 
     def _live_migration(self, context, instance, dest, post_method,
                         recover_method, block_migration=False,
-                        migrate_data=None):
+                        migrate_data=None, pclm=None):
         """Do live migration.
 
         :param context: security context
@@ -4496,12 +4510,28 @@ class LibvirtDriver(driver.ComputeDriver):
             flagvals = [getattr(libvirt, x.strip()) for x in flaglist]
             logical_sum = reduce(lambda x, y: x | y, flagvals)
 
-            dom = self._lookup_by_name(instance["name"])
-            dom.migrateToURI(CONF.libvirt.live_migration_uri % dest,
-                             logical_sum,
-                             None,
-                             CONF.libvirt.live_migration_bandwidth)
+            LOG.info(_('libvirt driver migrate to URI '
+                       '%(dest)s %(instance)s %(pclm)s.'),
+                     {'dest': dest, 'instance': instance["name"], 'pclm': pclm})
 
+            dom = self._lookup_by_name(instance["name"])
+            if not pclm:
+                LOG.info(_('libvirt driver migrate to migrateToURI %(uri)s.'),
+                         {'uri': CONF.libvirt.live_migration_uri % dest})
+                dom.migrateToURI(CONF.libvirt.live_migration_uri % dest,
+                                 logical_sum,
+                                 None,
+                                 CONF.libvirt.live_migration_bandwidth)
+            else:
+                LOG.info(_('libvirt driver migrate to migrateToURI2 %(uri)s %(miguri)s.'),
+                         {'uri': CONF.libvirt.live_migration_uri % dest,
+                          'miguri': CONF.libvirt.pclm_uri % (pclm, dest)} )
+                dom.migrateToURI2(CONF.libvirt.live_migration_uri % dest,
+                                  miguri = CONF.libvirt.pclm_uri % (pclm, dest),
+                                  dxml = None,
+                                  flags = logical_sum,
+                                  dname = None,
+                                  bandwidth = CONF.libvirt.live_migration_bandwidth)
         except Exception as e:
             with excutils.save_and_reraise_exception():
                 LOG.error(_("Live Migration failure: %s"), e,

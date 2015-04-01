@@ -635,7 +635,7 @@ class ComputeDriver(object):
 
     def live_migration(self, ctxt, instance_ref, dest,
                        post_method, recover_method, block_migration=False,
-                       migrate_data=None):
+                       migrate_data=None, pclm=None):
         """Live migration of an instance to another host.
 
         :param ctxt: security context
@@ -722,7 +722,8 @@ class ComputeDriver(object):
     def check_can_live_migrate_destination(self, ctxt, instance_ref,
                                            src_compute_info, dst_compute_info,
                                            block_migration=False,
-                                           disk_over_commit=False):
+                                           disk_over_commit=False,
+                                           pclm=None):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls

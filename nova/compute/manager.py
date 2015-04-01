@@ -4304,10 +4304,15 @@ class ComputeManager(manager.Manager):
                                                       new_volume_id,
                                                       error=failed)
 
+        mode = 'rw'
+        if 'data' in new_cinfo:
+            mode = new_cinfo['data'].get('access_mode', 'rw')
+
         self.volume_api.attach(context,
                                new_volume_id,
                                instance['uuid'],
-                               mountpoint)
+                               mountpoint,
+                               mode=mode)
         # Remove old connection
         self.volume_api.detach(context.elevated(), old_volume_id)
 
@@ -4363,39 +4368,45 @@ class ComputeManager(manager.Manager):
     def attach_interface(self, context, instance, network_id, port_id,
                          requested_ip):
         """Use hotplug to add an network adapter to an instance."""
-        network_info = self.network_api.allocate_port_for_instance(
-            context, instance, port_id, network_id, requested_ip)
-        if len(network_info) != 1:
-            LOG.error(_('allocate_port_for_instance returned %(ports)s ports')
-                      % dict(ports=len(network_info)))
-            raise exception.InterfaceAttachFailed(instance=instance)
-        image_ref = instance.get('image_ref')
-        image_service, image_id = glance.get_remote_image_service(
-            context, image_ref)
-        image_meta = compute_utils.get_image_metadata(
-            context, image_service, image_ref, instance)
+        @utils.synchronized(instance['uuid'])
+        def _sync_attach_interface():
+            network_info = self.network_api.allocate_port_for_instance(
+                context, instance, port_id, network_id, requested_ip)
+            if len(network_info) != 1:
+                LOG.error(_('allocate_port_for_instance returned %(ports)s ports')
+                          % dict(ports=len(network_info)))
+                raise exception.InterfaceAttachFailed(instance=instance)
+            image_ref = instance.get('image_ref')
+            image_service, image_id = glance.get_remote_image_service(
+                context, image_ref)
+            image_meta = compute_utils.get_image_metadata(
+                context, image_service, image_ref, instance)
 
-        self.driver.attach_interface(instance, image_meta, network_info[0])
-        return network_info[0]
+            self.driver.attach_interface(instance, image_meta, network_info[0])
+            return network_info[0]
+        return _sync_attach_interface()
 
     @object_compat
     def detach_interface(self, context, instance, port_id):
         """Detach an network adapter from an instance."""
-        # FIXME(comstud): Why does this need elevated context?
-        network_info = self._get_instance_nw_info(context.elevated(),
-                                                  instance)
-        condemned = None
-        for vif in network_info:
-            if vif['id'] == port_id:
-                condemned = vif
-                break
-        if condemned is None:
-            raise exception.PortNotFound(_("Port %s is not "
-                                           "attached") % port_id)
+        @utils.synchronized(instance['uuid'])
+        def _sync_dettach_interface():
+            # FIXME(comstud): Why does this need elevated context?
+            network_info = self._get_instance_nw_info(context.elevated(),
+                                                      instance)
+            condemned = None
+            for vif in network_info:
+                if vif['id'] == port_id:
+                    condemned = vif
+                    break
+            if condemned is None:
+                raise exception.PortNotFound(_("Port %s is not "
+                                               "attached") % port_id)
 
-        self.network_api.deallocate_port_for_instance(context, instance,
-                                                      port_id)
-        self.driver.detach_interface(instance, condemned)
+            self.network_api.deallocate_port_for_instance(context, instance,
+                                                          port_id)
+            self.driver.detach_interface(instance, condemned)
+        return _sync_dettach_interface()
 
     def _get_compute_info(self, context, host):
         compute_node_ref = self.conductor_api.service_get_by_compute_host(
@@ -4421,7 +4432,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def check_can_live_migrate_destination(self, ctxt, instance,
-                                           block_migration, disk_over_commit):
+                                           block_migration, disk_over_commit, pclm):
         """Check if it is possible to execute live migration.
 
         This runs checks on the destination host, and then calls
@@ -4437,7 +4448,7 @@ class ComputeManager(manager.Manager):
         dst_compute_info = self._get_compute_info(ctxt, CONF.host)
         dest_check_data = self.driver.check_can_live_migrate_destination(ctxt,
             instance, src_compute_info, dst_compute_info,
-            block_migration, disk_over_commit)
+            block_migration, disk_over_commit, pclm)
         migrate_data = {}
         try:
             migrate_data = self.compute_rpcapi.\
@@ -4520,7 +4531,7 @@ class ComputeManager(manager.Manager):
     @wrap_exception()
     @wrap_instance_fault
     def live_migration(self, context, dest, instance, block_migration,
-                       migrate_data):
+                       migrate_data, pclm):
         """Executing live migration.
 
         :param context: security context
@@ -4556,12 +4567,12 @@ class ComputeManager(manager.Manager):
         self.driver.live_migration(context, instance, dest,
                                    self._post_live_migration,
                                    self._rollback_live_migration,
-                                   block_migration, migrate_data)
+                                   block_migration, migrate_data, pclm)
 
     @wrap_exception()
     @wrap_instance_fault
     def _post_live_migration(self, ctxt, instance,
-                            dest, block_migration=False, migrate_data=None):
+                            dest, block_migration=False, migrate_data=None, pclm=None):
         """Post operations for live migration.
 
         This method is called from live_migration
@@ -4875,16 +4886,19 @@ class ComputeManager(manager.Manager):
                     break
 
         if instance:
-            # We have an instance now to refresh
-            try:
-                # Call to network API to get instance info.. this will
-                # force an update to the instance's info_cache
-                self._get_instance_nw_info(context, instance, use_slave=True)
-                LOG.debug(_('Updated the network info_cache for instance'),
-                          instance=instance)
-            except Exception:
-                LOG.error(_('An error occurred while refreshing the network '
-                            'cache.'), instance=instance, exc_info=True)
+            @utils.synchronized(instance['uuid'])
+            def _heal_instance_info_cache():
+                # We have an instance now to refresh
+                try:
+                    # Call to network API to get instance info.. this will
+                    # force an update to the instance's info_cache
+                    self._get_instance_nw_info(context, instance, use_slave=True)
+                    LOG.debug(_('Updated the network info_cache for instance'),
+                              instance=instance)
+                except Exception:
+                    LOG.error(_('An error occurred while refreshing the network '
+                                'cache.'), instance=instance, exc_info=True)
+            _heal_instance_info_cache()
         else:
             LOG.debug(_("Didn't find any instances for network info cache "
                         "update."))

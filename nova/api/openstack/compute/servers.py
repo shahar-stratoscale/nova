@@ -522,7 +522,15 @@ class Controller(wsgi.Controller):
             raise exc.HTTPBadRequest(explanation=err.format_message())
         return servers
 
-    def _get_servers(self, req, is_detail):
+    def stratolist(self, req):
+        """Returns a list of server details for stratoscale internal use."""
+        try:
+            servers = self._get_servers(req, is_detail=True, strato=True)
+        except exception.Invalid as err:
+            raise exc.HTTPBadRequest(explanation=err.format_message())
+        return servers
+
+    def _get_servers(self, req, is_detail, strato=False):
         """Returns a list of servers, based on any search options specified."""
 
         search_opts = {}
@@ -599,7 +607,8 @@ class Controller(wsgi.Controller):
                                                      search_opts=search_opts,
                                                      limit=limit,
                                                      marker=marker,
-                                                     want_objects=True)
+                                                     want_objects=True,
+                                                     strato=strato)
         except exception.MarkerNotFound:
             msg = _('marker [%s] not found') % marker
             raise exc.HTTPBadRequest(explanation=msg)
@@ -609,7 +618,9 @@ class Controller(wsgi.Controller):
             # TODO(mriedem): Move to ObjectListBase.__init__ for empty lists.
             instance_list = instance_obj.InstanceList(objects=[])
 
-        if is_detail:
+        if strato:
+            response = self._view_builder.strato(req, instance_list)
+        elif is_detail:
             instance_list.fill_faults()
             response = self._view_builder.detail(req, instance_list)
         else:

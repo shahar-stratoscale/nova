@@ -1953,7 +1953,7 @@ class AdminActionsSamplesJsonTest(ServersSampleBase):
     def test_post_live_migrate_server(self):
         # Get api samples to server live migrate request.
         def fake_live_migrate(_self, context, instance, scheduler_hint,
-                              block_migration, disk_over_commit):
+                              block_migration, disk_over_commit, pclm):
             self.assertEqual(self.uuid, instance["uuid"])
             host = scheduler_hint["host"]
             self.assertEqual(self.compute.host, host)
@@ -1976,7 +1976,8 @@ class AdminActionsSamplesJsonTest(ServersSampleBase):
 
         response = self._do_post('servers/%s/action' % self.uuid,
                                  'admin-actions-live-migrate',
-                                 {'hostname': self.compute.host})
+                                 {'hostname': self.compute.host,
+                                  'pclm': self.compute.host[:16]})
         self.assertEqual(response.status, 202)
 
     def test_post_reset_state(self):

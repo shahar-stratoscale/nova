@@ -15,6 +15,7 @@
         ],
         "name": "m1.tiny",
         "ram": 512,
+        "extra_specs": {},
         "vcpus": 1
     }
 }

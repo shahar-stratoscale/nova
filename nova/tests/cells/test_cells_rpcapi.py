@@ -684,11 +684,13 @@ class CellsAPITestCase(test.NoDBTestCase):
                                                 'fake-instance',
                                                 'fake-host',
                                                 'fake-block',
-                                                'fake-commit')
+                                                'fake-commit',
+                                                'fake-pclm')
         expected_args = {'instance': 'fake-instance',
                          'block_migration': 'fake-block',
                          'disk_over_commit': 'fake-commit',
-                         'host_name': 'fake-host'}
+                         'host_name': 'fake-host',
+                         'pclm': 'fake-pclm'}
         self._check_result(call_info, 'live_migrate_instance',
                            expected_args, version='1.20')
 

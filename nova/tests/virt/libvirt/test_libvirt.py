@@ -967,13 +967,13 @@ class LibvirtConnTestCase(test.TestCase):
                 self.assertEqual(cfg.clock.timers[1].tickpolicy,
                                       "catchup")
                 if expect_hpet:
-                    self.assertEqual(3, len(cfg.clock.timers))
-                    self.assertIsInstance(cfg.clock.timers[2],
+                    self.assertEqual(4, len(cfg.clock.timers))
+                    self.assertIsInstance(cfg.clock.timers[3],
                                           vconfig.LibvirtConfigGuestTimer)
-                    self.assertEqual('hpet', cfg.clock.timers[2].name)
-                    self.assertFalse(cfg.clock.timers[2].present)
+                    self.assertEqual('hpet', cfg.clock.timers[3].name)
+                    self.assertFalse(cfg.clock.timers[3].present)
                 else:
-                    self.assertEqual(2, len(cfg.clock.timers))
+                    self.assertEqual(3, len(cfg.clock.timers))
 
     def test_get_guest_config_windows(self):
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), True)
@@ -3798,6 +3798,7 @@ class LibvirtConnTestCase(test.TestCase):
                         'cpu_info': 'asdf',
                         }
         filename = "file"
+        pclm = "pclm"
 
         self.mox.StubOutWithMock(conn, '_create_shared_storage_test_file')
         self.mox.StubOutWithMock(conn, '_compare_cpu')
@@ -3810,11 +3811,15 @@ class LibvirtConnTestCase(test.TestCase):
 
         self.mox.ReplayAll()
         return_value = conn.check_can_live_migrate_destination(self.context,
-                instance_ref, compute_info, compute_info, True)
+                                                               instance_ref,
+                                                               compute_info,
+                                                               compute_info,
+                                                               pclm=pclm)
         self.assertThat({"filename": "file",
-                         'disk_available_mb': 409600,
+                         'disk_available_mb': None,
                          "disk_over_commit": False,
-                         "block_migration": True},
+                         "block_migration": False,
+                         "pclm": pclm},
                         matchers.DictMatches(return_value))
 
     def test_check_can_live_migrate_dest_all_pass_no_block_migration(self):
@@ -3822,6 +3827,7 @@ class LibvirtConnTestCase(test.TestCase):
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         compute_info = {'cpu_info': 'asdf'}
         filename = "file"
+        pclm = "pclm"
 
         self.mox.StubOutWithMock(conn, '_create_shared_storage_test_file')
         self.mox.StubOutWithMock(conn, '_compare_cpu')
@@ -3834,11 +3840,12 @@ class LibvirtConnTestCase(test.TestCase):
 
         self.mox.ReplayAll()
         return_value = conn.check_can_live_migrate_destination(self.context,
-                instance_ref, compute_info, compute_info, False)
+                instance_ref, compute_info, compute_info, pclm=pclm)
         self.assertThat({"filename": "file",
                          "block_migration": False,
                          "disk_over_commit": False,
-                         "disk_available_mb": None},
+                         "disk_available_mb": None,
+                         "pclm": pclm},
                         matchers.DictMatches(return_value))
 
     def test_check_can_live_migrate_dest_incompatible_cpu_raises(self):
@@ -3863,7 +3870,8 @@ class LibvirtConnTestCase(test.TestCase):
         dest_check_data = {"filename": "file",
                            "block_migration": True,
                            "disk_over_commit": False,
-                           "disk_available_mb": 1024}
+                           "disk_available_mb": 1024,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
 
         self.mox.StubOutWithMock(conn, '_cleanup_shared_storage_test_file')
@@ -3878,7 +3886,8 @@ class LibvirtConnTestCase(test.TestCase):
         dest_check_data = {"filename": "file",
                            "block_migration": True,
                            "disk_over_commit": False,
-                           "disk_available_mb": 1024}
+                           "disk_available_mb": 1024,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
 
         self.mox.StubOutWithMock(conn, "_check_shared_storage_test_file")
@@ -3901,7 +3910,8 @@ class LibvirtConnTestCase(test.TestCase):
                            "block_migration": False,
                            "disk_over_commit": False,
                            "disk_available_mb": 1024,
-                           "is_volume_backed": True}
+                           "is_volume_backed": True,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.mox.StubOutWithMock(conn, "_check_shared_storage_test_file")
         conn._check_shared_storage_test_file("file").AndReturn(False)
@@ -3919,7 +3929,8 @@ class LibvirtConnTestCase(test.TestCase):
                            "block_migration": False,
                            "disk_over_commit": False,
                            "disk_available_mb": 1024,
-                           "is_volume_backed": True}
+                           "is_volume_backed": True,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.mox.StubOutWithMock(conn, "_check_shared_storage_test_file")
         conn._check_shared_storage_test_file("file").AndReturn(False)
@@ -3937,7 +3948,8 @@ class LibvirtConnTestCase(test.TestCase):
                            "block_migration": False,
                            "disk_over_commit": False,
                            "disk_available_mb": 1024,
-                           "is_volume_backed": False}
+                           "is_volume_backed": False,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
         self.mox.StubOutWithMock(conn, "_check_shared_storage_test_file")
         conn._check_shared_storage_test_file("file").AndReturn(False)
@@ -3954,7 +3966,8 @@ class LibvirtConnTestCase(test.TestCase):
         dest_check_data = {"filename": "file",
                            "block_migration": True,
                            "disk_over_commit": False,
-                           'disk_available_mb': 1024}
+                           'disk_available_mb': 1024,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
 
         self.mox.StubOutWithMock(conn, "_check_shared_storage_test_file")
@@ -3972,7 +3985,8 @@ class LibvirtConnTestCase(test.TestCase):
         dest_check_data = {"filename": "file",
                            "block_migration": False,
                            "disk_over_commit": False,
-                           'disk_available_mb': 1024}
+                           'disk_available_mb': 1024,
+                           "pclm": "pclm"}
         conn = libvirt_driver.LibvirtDriver(fake.FakeVirtAPI(), False)
 
         self.mox.StubOutWithMock(conn, "_check_shared_storage_test_file")
@@ -4001,7 +4015,8 @@ class LibvirtConnTestCase(test.TestCase):
         dest_check_data = {"filename": "file",
                            "disk_available_mb": 0,
                            "block_migration": True,
-                           "disk_over_commit": False}
+                           "disk_over_commit": False,
+                           "pclm": "pclm"}
         self.mox.ReplayAll()
         self.assertRaises(exception.MigrationError,
                           conn.check_can_live_migrate_source,
@@ -4233,7 +4248,8 @@ class LibvirtConnTestCase(test.TestCase):
             migrate_data = {'is_shared_storage': False,
                             'is_volume_backed': True,
                             'block_migration': False,
-                            'instance_relative_path': inst_ref['name']
+                            'instance_relative_path': inst_ref['name'],
+                            "pclm": "pclm"
                             }
             ret = conn.pre_live_migration(c, inst_ref, vol, nw_info, None,
                                           migrate_data)

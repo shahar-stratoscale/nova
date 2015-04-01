@@ -1239,7 +1239,8 @@ class _BaseTaskTestCase(object):
                              mox.IsA(instance_obj.Instance),
                              'destination',
                              'block_migration',
-                             'disk_over_commit')
+                             'disk_over_commit',
+                             'pclm')
         self.mox.ReplayAll()
 
         if isinstance(self.conductor, (conductor_api.ComputeTaskAPI,
@@ -1247,11 +1248,11 @@ class _BaseTaskTestCase(object):
             # The API method is actually 'live_migrate_instance'.  It gets
             # converted into 'migrate_server' when doing RPC.
             self.conductor.live_migrate_instance(self.context, inst_obj,
-                'destination', 'block_migration', 'disk_over_commit')
+                'destination', 'block_migration', 'disk_over_commit', 'pclm')
         else:
             self.conductor.migrate_server(self.context, inst_obj,
                 {'host': 'destination'}, True, False, None,
-                 'block_migration', 'disk_over_commit')
+                 'block_migration', 'disk_over_commit', 'pclm')
 
     def test_cold_migrate(self):
         self.mox.StubOutWithMock(compute_utils, 'get_image_metadata')
@@ -1299,7 +1300,7 @@ class _BaseTaskTestCase(object):
         else:
             self.conductor.migrate_server(
                 self.context, inst_obj, scheduler_hint,
-                False, False, flavor, None, None, [])
+                False, False, flavor, None, None, None, [])
 
     def test_build_instances(self):
         instance_type = flavors.get_default_flavor()
@@ -1476,11 +1477,11 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
 
     def test_migrate_server_fails_with_rebuild(self):
         self.assertRaises(NotImplementedError, self.conductor.migrate_server,
-            self.context, None, None, True, True, None, None, None)
+            self.context, None, None, True, True, None, None, None, None)
 
     def test_migrate_server_fails_with_flavor(self):
         self.assertRaises(NotImplementedError, self.conductor.migrate_server,
-            self.context, None, None, True, False, "dummy", None, None)
+            self.context, None, None, True, False, "dummy", None, None, None)
 
     def _build_request_spec(self, instance):
         return {
@@ -1500,7 +1501,7 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
         ex = exc.DestinationHypervisorTooOld()
         live_migrate.execute(self.context, mox.IsA(instance_obj.Instance),
                              'destination', 'block_migration',
-                             'disk_over_commit').AndRaise(ex)
+                             'disk_over_commit', 'pclm').AndRaise(ex)
 
         scheduler_utils.set_vm_state_and_notify(self.context,
                 'compute_task', 'migrate_server',
@@ -1516,7 +1517,7 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
         self.assertRaises(exc.DestinationHypervisorTooOld,
             self.conductor.migrate_server, self.context, inst_obj,
             {'host': 'destination'}, True, False, None, 'block_migration',
-            'disk_over_commit')
+            'disk_over_commit', 'pclm')
 
     def test_migrate_server_deals_with_invalidcpuinfo_exception(self):
         instance = fake_instance.fake_db_instance(uuid='uuid',
@@ -1530,7 +1531,7 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
         ex = exc.InvalidCPUInfo(reason="invalid cpu info.")
         live_migrate.execute(self.context, mox.IsA(instance_obj.Instance),
                              'destination', 'block_migration',
-                             'disk_over_commit').AndRaise(ex)
+                             'disk_over_commit', 'pclm').AndRaise(ex)
 
         scheduler_utils.set_vm_state_and_notify(self.context,
                 'compute_task', 'migrate_server',
@@ -1546,7 +1547,7 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
         self.assertRaises(exc.InvalidCPUInfo,
             self.conductor.migrate_server, self.context, inst_obj,
             {'host': 'destination'}, True, False, None, 'block_migration',
-            'disk_over_commit')
+            'disk_over_commit', 'pclm')
 
     def test_migrate_server_deals_with_unexpected_exceptions(self):
         instance = fake_instance.fake_db_instance()
@@ -1559,7 +1560,7 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
         ex = IOError()
         live_migrate.execute(self.context, mox.IsA(instance_obj.Instance),
                              'destination', 'block_migration',
-                             'disk_over_commit').AndRaise(ex)
+                             'disk_over_commit', 'pclm').AndRaise(ex)
         self.mox.ReplayAll()
 
         self.conductor = utils.ExceptionHelper(self.conductor)
@@ -1567,7 +1568,7 @@ class ConductorTaskTestCase(_BaseTaskTestCase, test_compute.BaseTestCase):
         self.assertRaises(exc.MigrationError,
             self.conductor.migrate_server, self.context, inst_obj,
             {'host': 'destination'}, True, False, None, 'block_migration',
-            'disk_over_commit')
+            'disk_over_commit', 'pclm')
 
     def test_set_vm_state_and_notify(self):
         self.mox.StubOutWithMock(scheduler_utils,

@@ -527,7 +527,7 @@ class CellsAPI(object):
                    extra_instance_updates=extra_instance_updates)
 
     def live_migrate_instance(self, ctxt, instance, host_name,
-                              block_migration, disk_over_commit):
+                              block_migration, disk_over_commit, pclm):
         if not CONF.cells.enable:
             return
         cctxt = self.client.prepare(version='1.20')
@@ -535,7 +535,8 @@ class CellsAPI(object):
                    instance=instance,
                    block_migration=block_migration,
                    disk_over_commit=disk_over_commit,
-                   host_name=host_name)
+                   host_name=host_name,
+                   pclm=pclm)
 
     def revert_resize(self, ctxt, instance, migration, host,
                       reservations):

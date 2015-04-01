@@ -831,7 +831,7 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
             self.assertTrue(uuidutils.is_uuid_like(volume_id))
             return volumes[volume_id]
 
-        def fake_vol_attach(context, volume_id, instance_uuid, connector):
+        def fake_vol_attach(context, volume_id, instance_uuid, connector, mode):
             self.assertTrue(uuidutils.is_uuid_like(volume_id))
             self.assertIn(volumes[volume_id]['status'],
                           ['available', 'attaching'])
@@ -953,6 +953,7 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
         instance.host = 'fake-host'
         block_migration = 'block_migration'
         disk_over_commit = 'disk_over_commit'
+        pclm = 'pclm'
         src_info = 'src_info'
         dest_info = 'dest_info'
         dest_check_data = dict(foo='bar')
@@ -976,7 +977,7 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
                                        CONF.host).AndReturn(dest_info)
         self.compute.driver.check_can_live_migrate_destination(
                 self.context, instance, src_info, dest_info,
-                block_migration, disk_over_commit).AndReturn(dest_check_data)
+                block_migration, disk_over_commit, pclm).AndReturn(dest_check_data)
 
         mock_meth = self.compute.compute_rpcapi.check_can_live_migrate_source(
                 self.context, instance, dest_check_data)
@@ -996,7 +997,8 @@ class ComputeManagerUnitTestCase(test.NoDBTestCase):
         result = self.compute.check_can_live_migrate_destination(
                 self.context, instance=instance,
                 block_migration=block_migration,
-                disk_over_commit=disk_over_commit)
+                disk_over_commit=disk_over_commit,
+                pclm=pclm)
         self.assertEqual(expected_result, result)
 
     def test_check_can_live_migrate_destination_success(self):

@@ -379,9 +379,9 @@ class FakeDriver(driver.ComputeDriver):
 
     def live_migration(self, context, instance_ref, dest,
                        post_method, recover_method, block_migration=False,
-                       migrate_data=None):
+                       migrate_data=None, pclm=None):
         post_method(context, instance_ref, dest, block_migration,
-                            migrate_data)
+                            migrate_data, pclm)
         return
 
     def check_can_live_migrate_destination_cleanup(self, ctxt,
@@ -391,7 +391,8 @@ class FakeDriver(driver.ComputeDriver):
     def check_can_live_migrate_destination(self, ctxt, instance_ref,
                                            src_compute_info, dst_compute_info,
                                            block_migration=False,
-                                           disk_over_commit=False):
+                                           disk_over_commit=False,
+                                           pclm=None):
         return {}
 
     def check_can_live_migrate_source(self, ctxt, instance_ref,

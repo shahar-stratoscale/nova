@@ -350,14 +350,15 @@ class ComputeAPI(object):
                    instance=instance, diff=diff)
 
     def check_can_live_migrate_destination(self, ctxt, instance, destination,
-                                           block_migration, disk_over_commit):
+                                           block_migration, disk_over_commit, pclm):
         # NOTE(russellb) Havana compat
         version = self._get_compat_version('3.0', '2.38')
         cctxt = self.client.prepare(server=destination, version=version)
         return cctxt.call(ctxt, 'check_can_live_migrate_destination',
                           instance=instance,
                           block_migration=block_migration,
-                          disk_over_commit=disk_over_commit)
+                          disk_over_commit=disk_over_commit,
+                          pclm=pclm)
 
     def check_can_live_migrate_source(self, ctxt, instance, dest_check_data):
         # NOTE(russellb) Havana compat
@@ -533,14 +534,14 @@ class ComputeAPI(object):
                 version=version)
         cctxt.cast(ctxt, 'inject_network_info', instance=instance)
 
-    def live_migration(self, ctxt, instance, dest, block_migration, host,
+    def live_migration(self, ctxt, instance, dest, block_migration, host, pclm,
                        migrate_data=None):
         # NOTE(russellb) Havana compat
         version = self._get_compat_version('3.0', '2.0')
         instance_p = jsonutils.to_primitive(instance)
         cctxt = self.client.prepare(server=host, version=version)
         cctxt.cast(ctxt, 'live_migration', instance=instance_p,
-                   dest=dest, block_migration=block_migration,
+                   dest=dest, block_migration=block_migration, pclm=pclm,
                    migrate_data=migrate_data)
 
     def pause_instance(self, ctxt, instance):

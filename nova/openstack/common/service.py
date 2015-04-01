@@ -41,6 +41,7 @@ from nova.openstack.common import eventlet_backdoor
 from nova.openstack.common.gettextutils import _  # noqa
 from nova.openstack.common import importutils
 from nova.openstack.common import log as logging
+from nova.openstack.common import systemd
 from nova.openstack.common import threadgroup
 
 
@@ -189,6 +190,7 @@ class ServiceLauncher(Launcher):
         return status, signo
 
     def wait(self, ready_callback=None):
+        systemd.notify_once()
         while True:
             self.handle_signal()
             status, signo = self._wait_for_exit_or_signal(ready_callback)
@@ -375,6 +377,7 @@ class ProcessLauncher(object):
     def wait(self):
         """Loop waiting on children to die and respawning as necessary."""
 
+        systemd.notify_once()
         LOG.debug(_('Full set of CONF:'))
         CONF.log_opt_values(LOG, std_logging.DEBUG)
 

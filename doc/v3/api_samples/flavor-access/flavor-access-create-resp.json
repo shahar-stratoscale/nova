@@ -16,6 +16,7 @@
             }
         ],
         "name": "test_flavor",
+        "extra_specs": {},
         "ram": 1024,
         "swap": 0,
         "vcpus": 2

@@ -41,12 +41,14 @@ class LiveMigrationTaskTestCase(test.NoDBTestCase):
         self.destination = "destination"
         self.block_migration = "bm"
         self.disk_over_commit = "doc"
+        self.pclm = "pclm"
         self._generate_task()
 
     def _generate_task(self):
         self.task = live_migrate.LiveMigrationTask(self.context,
             self.instance, self.destination, self.block_migration,
-            self.disk_over_commit)
+            self.disk_over_commit,
+            self.pclm)
 
     def test_execute_with_destination(self):
         self.mox.StubOutWithMock(self.task, '_check_host_is_up')
@@ -60,6 +62,7 @@ class LiveMigrationTaskTestCase(test.NoDBTestCase):
                 instance=self.instance,
                 dest=self.destination,
                 block_migration=self.block_migration,
+                pclm=self.pclm,
                 migrate_data=None).AndReturn("bob")
 
         self.mox.ReplayAll()
@@ -81,6 +84,7 @@ class LiveMigrationTaskTestCase(test.NoDBTestCase):
                 instance=self.instance,
                 dest="found_host",
                 block_migration=self.block_migration,
+                pclm=self.pclm,
                 migrate_data=None).AndReturn("bob")
 
         self.mox.ReplayAll()
@@ -151,7 +155,7 @@ class LiveMigrationTaskTestCase(test.NoDBTestCase):
 
         self.task.compute_rpcapi.check_can_live_migrate_destination(
                 self.context, self.instance, self.destination,
-                self.block_migration, self.disk_over_commit).AndReturn(
+                self.block_migration, self.disk_over_commit, self.pclm).AndReturn(
                         "migrate_data")
 
         self.mox.ReplayAll()

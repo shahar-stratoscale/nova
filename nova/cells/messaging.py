@@ -890,11 +890,11 @@ class _TargetedMessageMethods(_BaseMessageMethods):
                                         **extra_instance_updates)
 
     def live_migrate_instance(self, message, instance, block_migration,
-                              disk_over_commit, host_name):
+                              disk_over_commit, host_name, pclm):
         """Live migrate an instance via compute_api.live_migrate()."""
         self._call_compute_api_with_obj(message.ctxt, instance,
                                         'live_migrate', block_migration,
-                                        disk_over_commit, host_name)
+                                        disk_over_commit, host_name, pclm)
 
     def revert_resize(self, message, instance):
         """Revert a resize for an instance in its cell."""
@@ -1758,11 +1758,12 @@ class MessageRunner(object):
                               extra_kwargs=extra_kwargs)
 
     def live_migrate_instance(self, ctxt, instance, block_migration,
-                              disk_over_commit, host_name):
+                              disk_over_commit, host_name, pclm):
         """Live migrate an instance in its cell."""
         extra_kwargs = dict(block_migration=block_migration,
                             disk_over_commit=disk_over_commit,
-                            host_name=host_name)
+                            host_name=host_name,
+                            pclm=pclm)
         self._instance_action(ctxt, instance, 'live_migrate_instance',
                               extra_kwargs=extra_kwargs)
 

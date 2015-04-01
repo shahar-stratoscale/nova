@@ -76,8 +76,9 @@ class MigrateServerController(wsgi.Controller):
             block_migration = body["migrate_live"]["block_migration"]
             disk_over_commit = body["migrate_live"]["disk_over_commit"]
             host = body["migrate_live"]["host"]
+            pclm = body["migrate_live"]["pclm"]
         except (TypeError, KeyError):
-            msg = _("host, block_migration and disk_over_commit must "
+            msg = _("host, block_migration, disk_over_commit and pclm must "
                     "be specified for live migration.")
             raise exc.HTTPBadRequest(explanation=msg)
 
@@ -93,7 +94,7 @@ class MigrateServerController(wsgi.Controller):
             instance = common.get_instance(self.compute_api, context, id,
                                            want_objects=True)
             self.compute_api.live_migrate(context, instance, block_migration,
-                                          disk_over_commit, host)
+                                          disk_over_commit, host, pclm)
         except (exception.ComputeServiceUnavailable,
                 exception.InvalidHypervisorType,
                 exception.UnableToMigrateToSelf,
