@@ -86,7 +86,7 @@ class Controller(wsgi.Controller):
         """Return data about the given flavor id."""
         try:
             context = req.environ['nova.context']
-            flavor = flavors.get_flavor_by_flavor_id(id, ctxt=context)
+            flavor = flavors.get_flavor_by_flavor_id(id, ctxt=context, read_deleted='no')
             req.cache_db_flavor(flavor)
         except exception.NotFound:
             raise webob.exc.HTTPNotFound()
